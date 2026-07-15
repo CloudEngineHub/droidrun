@@ -64,7 +64,7 @@ def test_cloud_uuid_auto_routes_only_with_cloud_credential(monkeypatch):
 
     monkeypatch.setattr(device_commands, "resolve_cloud_api_key", lambda: "cloud-token")
     monkeypatch.setattr(
-        "mobilerun.tools.driver.cloud.CloudDriver",
+        "mobilerun_core.driver.cloud.CloudDriver",
         FakeCloudDriver,
     )
     driver, is_ios = asyncio.run(

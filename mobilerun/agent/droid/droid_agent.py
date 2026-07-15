@@ -80,10 +80,10 @@ from mobilerun.telemetry import (
     capture,
     flush,
 )
-from mobilerun.tools.driver.ios import IOSDriver, discover_ios_portal
-from mobilerun.tools.driver.recording import RecordingDriver
-from mobilerun.tools.driver.stealth import StealthDriver
-from mobilerun.tools.driver.visual_remote import (
+from mobilerun_core_local.driver.ios import IOSDriver, discover_ios_portal
+from mobilerun_core_local.driver.recording import RecordingDriver
+from mobilerun_core_local.driver.stealth import StealthDriver
+from mobilerun_core_local.driver.visual_remote import (
     VISUAL_REMOTE_CONNECTION,
     VISUAL_REMOTE_DEFAULT_URL,
     VisualRemoteDriver,

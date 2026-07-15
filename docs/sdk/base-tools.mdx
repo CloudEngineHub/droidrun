@@ -34,12 +34,12 @@ Every method raises `NotImplementedError` by default. Concrete drivers override 
 The tools architecture follows a multi-layer pattern:
 
 1. **DeviceDriver**: Base class for raw device I/O (provided by `mobilerun-core-local`). Methods raise `NotImplementedError` by default.
-2. **Driver Implementations**: Platform-specific drivers. Implementations live in `mobilerun-core` (cloud) and `mobilerun-core-local` (local/on-device); the `mobilerun/tools/driver/*` modules below are stable compat import paths that re-export them.
+2. **Driver Implementations**: Platform-specific drivers. Implementations live in `mobilerun-core` (cloud) and `mobilerun-core-local` (local/on-device). Framework code imports them from those packages directly; `from mobilerun.tools.driver import <Name>` remains as the stable public compat import path.
    - `AndroidDriver`: Android devices via ADB + Portal app (implementation in `mobilerun-core-local`)
-   - `IOSDriver` (compat path `tools/driver/ios.py`): iOS devices via HTTP REST API to Portal app (implementation in `mobilerun-core-local`)
-   - `StealthDriver` (compat path `tools/driver/stealth.py`): Wraps another driver, adds human-like timing jitter (implementation in `mobilerun-core-local`)
-   - `RecordingDriver` (compat path `tools/driver/recording.py`): Wraps another driver with trajectory recording (implementation in `mobilerun-core-local`)
-   - `CloudDriver` (compat path `tools/driver/cloud.py`): Cloud-hosted device driver (implementation in `mobilerun-core`)
+   - `IOSDriver`: iOS devices via HTTP REST API to Portal app (implementation in `mobilerun-core-local`)
+   - `StealthDriver`: Wraps another driver, adds human-like timing jitter (implementation in `mobilerun-core-local`)
+   - `RecordingDriver`: Wraps another driver with trajectory recording (implementation in `mobilerun-core-local`)
+   - `CloudDriver`: Cloud-hosted device driver (implementation in `mobilerun-core`)
 3. **StateProvider** (`tools/ui/provider.py`): Fetches raw data from a driver, applies filters/formatters, produces `UIState`
 4. **UIState** (`tools/ui/state.py`): Parsed UI elements with element resolution (`get_element()`, `get_element_coords()`, `get_element_info()`, `get_clear_point()`, `convert_point()`)
 5. **ToolRegistry** (`agent/tool_registry.py`): Central registry of all agent-callable tools

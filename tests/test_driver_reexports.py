@@ -1,10 +1,10 @@
-"""Compat-shim tests for mobilerun.tools.driver.
+"""Compat-surface tests for mobilerun.tools.driver.
 
-The concrete driver implementations moved to mobilerun-core (CloudDriver) and
-mobilerun-core-local (RecordingDriver, StealthDriver, VisualRemoteDriver).
-mobilerun.tools.driver.* now re-exports those names to preserve historical
-import paths. These tests assert the re-exports still work and resolve to
-the exact same classes as the core packages.
+The concrete driver implementations live in mobilerun-core (CloudDriver) and
+mobilerun-core-local (everything else). Framework code imports them from those
+packages directly; the ``mobilerun.tools.driver`` package is the single
+remaining public compat surface. These tests assert it keeps working and
+resolves to the exact same classes as the core packages.
 """
 
 import unittest
@@ -16,39 +16,19 @@ import mobilerun_core_local.driver.visual_remote
 
 import mobilerun.tools
 from mobilerun.tools.driver import (
+    AndroidDriver,
     CloudDriver,
+    DeviceDisconnectedError,
+    DeviceDriver,
+    IOSDriver,
     RecordingDriver,
     StealthDriver,
     VisualRemoteDriver,
 )
-from mobilerun.tools.driver.cloud import CloudDriver as CloudDriverFromSubmodule
-from mobilerun.tools.driver.recording import (
-    RecordingDriver as RecordingDriverFromSubmodule,
-)
-from mobilerun.tools.driver.stealth import StealthDriver as StealthDriverFromSubmodule
-from mobilerun.tools.driver.visual_remote import (
-    VisualRemoteDriver as VisualRemoteDriverFromSubmodule,
-)
 
 
-class DriverReexportImportTest(unittest.TestCase):
-    """Public names must be importable both from the package and each shim submodule."""
-
-    def test_recording_driver_importable_from_submodule(self):
-        self.assertIs(RecordingDriverFromSubmodule, RecordingDriver)
-
-    def test_stealth_driver_importable_from_submodule(self):
-        self.assertIs(StealthDriverFromSubmodule, StealthDriver)
-
-    def test_visual_remote_driver_importable_from_submodule(self):
-        self.assertIs(VisualRemoteDriverFromSubmodule, VisualRemoteDriver)
-
-    def test_cloud_driver_importable_from_submodule(self):
-        self.assertIs(CloudDriverFromSubmodule, CloudDriver)
-
-
-class DriverReexportIdentityTest(unittest.TestCase):
-    """Shim classes must be the exact same objects as the core implementations."""
+class DriverCompatIdentityTest(unittest.TestCase):
+    """Compat names must be the exact same objects as the core implementations."""
 
     def test_recording_driver_is_core_local_implementation(self):
         self.assertIs(
@@ -75,7 +55,7 @@ class DriverReexportIdentityTest(unittest.TestCase):
         )
 
 
-class DriverReexportPackageLevelTest(unittest.TestCase):
+class DriverCompatPackageLevelTest(unittest.TestCase):
     """mobilerun.tools re-exports a subset of driver names; verify those hold identity too."""
 
     def test_recording_driver_reexported_from_tools_package(self):

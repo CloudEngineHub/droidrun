@@ -19,7 +19,7 @@ from mobilerun_core_local.driver.android.portal import ensure_portal_ready
 from rich.console import Console
 
 from mobilerun.config_manager import ConfigLoader
-from mobilerun.tools.driver.ios import (
+from mobilerun_core_local.driver.ios import (
     IOSDriver,
     discover_ios_portal,
     validate_ios_portal_url,
@@ -144,7 +144,7 @@ async def _create_driver(
                 f"No cloud API key found. Set {CLOUD_API_KEY_ENV} or run "
                 "`mobilerun login`."
             )
-        from mobilerun.tools.driver.cloud import CloudDriver
+        from mobilerun_core.driver.cloud import CloudDriver
 
         driver = CloudDriver(
             device_id=cloud_device_id,
