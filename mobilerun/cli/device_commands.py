@@ -144,7 +144,7 @@ async def _create_driver(
                 f"No cloud API key found. Set {CLOUD_API_KEY_ENV} or run "
                 "`mobilerun login`."
             )
-        from mobilerun_core.driver.cloud import CloudDriver
+        from mobilerun_core_local.driver.cloud import CloudDriver
 
         driver = CloudDriver(
             device_id=cloud_device_id,

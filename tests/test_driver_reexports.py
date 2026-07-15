@@ -1,7 +1,7 @@
 """Compat-surface tests for mobilerun.tools.driver.
 
-The concrete driver implementations live in mobilerun-core (CloudDriver) and
-mobilerun-core-local (everything else). Framework code imports them from those
+The concrete driver implementations live in mobilerun-core-local (CloudDriver
+behind the [cloud] extra). Framework code imports them from those
 packages directly; the ``mobilerun.tools.driver`` package is the single
 remaining public compat surface. These tests assert it keeps working and
 resolves to the exact same classes as the core packages.
@@ -9,7 +9,7 @@ resolves to the exact same classes as the core packages.
 
 import unittest
 
-import mobilerun_core.driver.cloud
+import mobilerun_core_local.driver.cloud
 import mobilerun_core_local.driver.recording
 import mobilerun_core_local.driver.stealth
 import mobilerun_core_local.driver.visual_remote
@@ -48,10 +48,10 @@ class DriverCompatIdentityTest(unittest.TestCase):
             mobilerun_core_local.driver.visual_remote.VisualRemoteDriver,
         )
 
-    def test_cloud_driver_is_core_implementation(self):
+    def test_cloud_driver_is_core_local_implementation(self):
         self.assertIs(
             CloudDriver,
-            mobilerun_core.driver.cloud.CloudDriver,
+            mobilerun_core_local.driver.cloud.CloudDriver,
         )
 
 
