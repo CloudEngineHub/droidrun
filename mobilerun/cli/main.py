@@ -64,8 +64,8 @@ from mobilerun.config_manager.credential_paths import (
 from mobilerun.log_handlers import CLILogHandler, configure_logging
 from mobilerun.macro.cli import macro_cli
 from mobilerun.telemetry import print_telemetry_message
-from mobilerun.tools.driver.ios import discover_ios_portal, validate_ios_portal_url
-from mobilerun.tools.driver.visual_remote import VISUAL_REMOTE_CONNECTION
+from mobilerun_core_local.driver.ios import discover_ios_portal, validate_ios_portal_url
+from mobilerun_core_local.driver.visual_remote import VISUAL_REMOTE_CONNECTION
 
 # Suppress all warnings
 warnings.filterwarnings("ignore")

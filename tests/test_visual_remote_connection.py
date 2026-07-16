@@ -3,7 +3,7 @@ import unittest
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from PIL import Image
 
@@ -12,8 +12,7 @@ from mobilerun.agent.utils.actions import click_area, click_at, long_press_at, s
 from mobilerun.agent.utils.signatures import build_tool_registry
 from mobilerun.config_manager.config_manager import MobileConfig
 from mobilerun.config_manager.prompt_loader import PromptLoader
-from mobilerun.tools.driver.ios import IOSDriver
-from mobilerun.tools.driver.visual_remote import VisualRemoteDriver
+from mobilerun_core_local.driver.ios import IOSDriver
 from mobilerun.tools.helpers.images import (
     image_dimensions,
     resize_image_to_max_side,
@@ -80,145 +79,6 @@ class FakeAsyncClient:
 
     async def aclose(self):
         self.closed = True
-
-
-def _device(
-    device_id: str = "device-1",
-    platform: str = "ios",
-    ready: bool = True,
-    capabilities: dict | None = None,
-) -> dict:
-    return {
-        "id": device_id,
-        "name": "Phone",
-        "platform": platform,
-        "ready": ready,
-        "capabilities": capabilities
-        or {
-            "screenshot": True,
-            "tap": True,
-            "swipe": True,
-            "type_text": True,
-            "press_button": ["enter"],
-            "open_app": False,
-            "accessibility_tree": False,
-        },
-    }
-
-
-class VisualRemoteDriverTest(unittest.TestCase):
-    def _connect(self, devices):
-        client = FakeAsyncClient(devices=devices)
-        with patch(
-            "mobilerun.tools.driver.visual_remote.httpx.AsyncClient",
-            return_value=client,
-        ):
-            driver = VisualRemoteDriver("http://localhost:8090")
-            asyncio.run(driver.connect())
-        return driver, client
-
-    def test_selects_single_ready_device_and_fetches_screenshot(self):
-        driver, client = self._connect([_device(platform="android")])
-
-        self.assertEqual(driver.device_id, "device-1")
-        self.assertEqual(driver.platform, "Android")
-        self.assertIn("tap", driver.supported)
-        self.assertIn("input_text", driver.supported)
-
-        screenshot = asyncio.run(driver.screenshot())
-        self.assertEqual(screenshot, _png())
-        self.assertIn(("GET", "/devices/device-1/screenshot", {}), client.requests)
-
-    def test_multiple_devices_require_device_id(self):
-        client = FakeAsyncClient(devices=[_device("a"), _device("b")])
-        with patch(
-            "mobilerun.tools.driver.visual_remote.httpx.AsyncClient",
-            return_value=client,
-        ):
-            driver = VisualRemoteDriver("http://localhost:8090")
-            with self.assertRaisesRegex(ConnectionError, "Multiple visual remote"):
-                asyncio.run(driver.connect())
-
-    def test_not_ready_device_fails_clearly(self):
-        client = FakeAsyncClient(devices=[_device(ready=False)])
-        with patch(
-            "mobilerun.tools.driver.visual_remote.httpx.AsyncClient",
-            return_value=client,
-        ):
-            driver = VisualRemoteDriver("http://localhost:8090")
-            with self.assertRaisesRegex(ConnectionError, "not ready"):
-                asyncio.run(driver.connect())
-
-    def test_actions_send_screenshot_pixel_coordinates_and_screen_size(self):
-        driver, client = self._connect([_device()])
-
-        asyncio.run(driver.screenshot())
-        asyncio.run(driver.tap(420, 730))
-        asyncio.run(driver.swipe(10, 20, 30, 40, duration_ms=500))
-        asyncio.run(driver.input_text("hello", clear=True))
-        asyncio.run(driver.press_button("enter"))
-
-        post_payloads = [
-            request[2] for request in client.requests if request[0] == "POST"
-        ]
-        self.assertEqual(
-            post_payloads[0],
-            {
-                "action": "tap",
-                "x": 420,
-                "y": 730,
-                "coordinate_space": "screenshot_pixels",
-                "screen": {"width": 1320, "height": 2868},
-            },
-        )
-        self.assertEqual(post_payloads[1]["action"], "swipe")
-        self.assertEqual(post_payloads[1]["screen"], {"width": 1320, "height": 2868})
-        self.assertEqual(
-            post_payloads[2],
-            {"action": "type_text", "text": "hello", "clear": True},
-        )
-        self.assertEqual(
-            post_payloads[3],
-            {"action": "press_button", "button": "enter"},
-        )
-
-    def test_open_app_unsupported_returns_failure_message(self):
-        driver, client = self._connect([_device()])
-
-        result = asyncio.run(driver.start_app("com.example.app"))
-
-        self.assertIn("does not support app launch", result)
-        self.assertFalse(
-            [request for request in client.requests if request[0] == "POST"]
-        )
-
-    def test_open_app_supported_posts_exact_identifier(self):
-        driver, client = self._connect(
-            [
-                _device(
-                    platform="android",
-                    capabilities={
-                        "screenshot": True,
-                        "tap": True,
-                        "open_app": True,
-                        "accessibility_tree": False,
-                    },
-                )
-            ]
-        )
-
-        result = asyncio.run(driver.start_app("com.example.app"))
-
-        self.assertEqual(result, "Launched com.example.app")
-        self.assertIn(
-            (
-                "POST",
-                "/devices/device-1/actions",
-                {"action": "open_app", "package": "com.example.app"},
-                {},
-            ),
-            client.requests,
-        )
 
 
 class ScreenshotOnlyStateProviderTest(unittest.TestCase):

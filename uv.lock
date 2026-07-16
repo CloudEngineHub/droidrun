@@ -1793,7 +1793,7 @@ wheels = [
 
 [[package]]
 name = "mobilerun"
-version = "0.6.8"
+version = "0.6.10"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1810,7 +1810,7 @@ dependencies = [
     { name = "llama-index-llms-openrouter" },
     { name = "llama-index-workflows" },
     { name = "mcp" },
-    { name = "mobilerun-core-local" },
+    { name = "mobilerun-core-local", extra = ["cloud"] },
     { name = "mobilerun-sdk" },
     { name = "posthog" },
     { name = "pydantic" },
@@ -1874,7 +1874,7 @@ requires-dist = [
     { name = "llama-index-workflows", specifier = ">=2.16.0,<3.0.0" },
     { name = "mcp", specifier = ">=1.26.0" },
     { name = "mobilerun", extras = ["langfuse"], marker = "extra == 'dev'" },
-    { name = "mobilerun-core-local", specifier = ">=0.3.1" },
+    { name = "mobilerun-core-local", extras = ["cloud"], specifier = ">=0.5.0" },
     { name = "mobilerun-sdk", specifier = ">=3.2.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "openinference-instrumentation-llama-index", marker = "extra == 'langfuse'", specifier = ">=3.0.0" },
@@ -1901,7 +1901,7 @@ dev = [
 
 [[package]]
 name = "mobilerun-core-local"
-version = "0.3.1"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "async-adbutils" },
@@ -1909,9 +1909,14 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/8b/1a2d0585b3675dec10a15f84f37938c53ecceff984122baa54d7861e4606/mobilerun_core_local-0.3.1.tar.gz", hash = "sha256:9e23ca8c98de1651ffc1de2990ff6bf658379839d9309f6b5882f5eb345eb70d", size = 49920, upload-time = "2026-06-23T16:45:15.087Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/08/673a58a645c5b1e4087beed98c79bd92fea247a1f9370f34df6436eb1d91/mobilerun_core_local-0.5.0.tar.gz", hash = "sha256:1c9dafb5d963ca5a1eb0c9d989f58e32d6f4c1f8dad5f54bf3a9a967599c19d9", size = 66006, upload-time = "2026-07-15T10:17:59.011Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/59/c8/7844b86724598a44dc9f74d32236808b7c2f99e626ca0dbeaddd885506b4/mobilerun_core_local-0.3.1-py3-none-any.whl", hash = "sha256:5be484a5d2ebd97bca782a8685d3e3515e151e556d29eeb71439b2af8c9b2a02", size = 35910, upload-time = "2026-06-23T16:45:13.838Z" },
+    { url = "https://files.pythonhosted.org/packages/61/a6/37836c1417fd97b4ae633ca618366d364631406afd71d5e50f44bbb88b1a/mobilerun_core_local-0.5.0-py3-none-any.whl", hash = "sha256:2f42f1bc73f5eea482abf43ea16a264fbbd0ec1bdaec500068e03e886988f9be", size = 46187, upload-time = "2026-07-15T10:17:57.684Z" },
+]
+
+[package.optional-dependencies]
+cloud = [
+    { name = "mobilerun-sdk" },
 ]
 
 [[package]]
