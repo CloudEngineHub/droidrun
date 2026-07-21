@@ -7,20 +7,21 @@ from dataclasses import dataclass
 
 FINAL_RESPONSE_TAGS = ("request_accomplished", "answer")
 
-_SUCCESS_ATTR_RE = re.compile(
-    r"""\bsuccess\s*=\s*(?P<quote>["'])(?P<value>true|false)(?P=quote)""",
-    re.IGNORECASE | re.DOTALL,
+_MANAGER_RESULT_TAGS = ("plan", *FINAL_RESPONSE_TAGS)
+_TAG_TOKEN_RE = re.compile(
+    r"""<(?P<closing>/)?(?P<tag>[A-Za-z][\w:.-]*)
+    (?P<attrs>(?:[^<>"']+|"[^"]*"|'[^']*')*)>""",
+    re.DOTALL | re.VERBOSE,
 )
-_SUCCESS_ATTR_PRESENT_RE = re.compile(r"\bsuccess\s*=", re.IGNORECASE | re.DOTALL)
-_FINAL_TAG_RE = re.compile(
-    r"<(?P<tag>request_accomplished|answer)\b(?P<attrs>[^>]*)>"
-    r"(?P<body>.*?)"
-    r"</(?P=tag)>",
-    re.IGNORECASE | re.DOTALL,
+_SPACED_MANAGER_RESULT_TAG_RE = re.compile(
+    r"""<(?:\s+/?\s*|/\s+)(?P<tag>plan|request_accomplished|answer)\b""",
+    re.IGNORECASE,
 )
-_FINAL_OPEN_TAG_RE = re.compile(
-    r"<(?P<tag>request_accomplished|answer)\b(?P<attrs>[^>]*)>",
-    re.IGNORECASE | re.DOTALL,
+_ATTRIBUTE_RE = re.compile(
+    r"""\s+(?P<name>[^\s=/>]+)
+    (?:\s*=\s*(?:(?P<quote>["'])(?P<quoted_value>.*?)(?P=quote)
+    |(?P<bare_value>[^\s>]+)))?""",
+    re.DOTALL | re.VERBOSE,
 )
 
 
@@ -28,8 +29,6 @@ _FINAL_OPEN_TAG_RE = re.compile(
 class ManagerResponseValidation:
     is_valid: bool
     error_message: str | None = None
-    can_continue_with_plan: bool = False
-    can_accept_final_without_success: bool = False
 
 
 class ManagerResponseValidationError(RuntimeError):
@@ -49,27 +48,106 @@ def _tag_content(match: re.Match[str]) -> str:
 
 
 def _success_from_attrs(attrs: str) -> bool | None:
-    match = _SUCCESS_ATTR_RE.search(attrs)
-    if not match:
+    """Return a final tag's one valid, explicit success attribute.
+
+    Only an attribute whose *name* is exactly ``success`` is accepted.  This
+    deliberately rejects look-alikes such as ``data-success`` and strings in
+    another attribute's value, as well as duplicate or unquoted attributes.
+    """
+    success_attributes: list[tuple[str | None, str]] = []
+    position = 0
+
+    while position < len(attrs):
+        if not attrs[position:].strip():
+            break
+
+        match = _ATTRIBUTE_RE.match(attrs, position)
+        if not match:
+            return None
+
+        if match.group("name").lower() == "success":
+            value = match.group("quoted_value") or match.group("bare_value")
+            success_attributes.append((match.group("quote"), value or ""))
+        position = match.end()
+
+    if len(success_attributes) != 1:
         return None
-    return match.group("value").lower() == "true"
+
+    quote, value = success_attributes[0]
+    if quote is None or value.lower() not in {"true", "false"}:
+        return None
+    return value.lower() == "true"
 
 
-def strip_manager_final_tags(response: str) -> str:
-    """Remove final answer tags while leaving reasoning and plan tags intact."""
-    return _FINAL_TAG_RE.sub("", response).strip()
+def _find_top_level_manager_result_tags(
+    response: str,
+) -> tuple[list[dict[str, str]], list[str]]:
+    """Find well-formed top-level result tags and report unsafe control tags.
 
+    Manager output is XML-like rather than a complete XML document, so a small
+    stack parser is more robust than globally matching ``<plan>`` and terminal
+    tags.  In particular, control-tag-looking text inside a thought, memory,
+    or plan must not turn into a plan or final result.
+    """
+    stack: list[dict[str, str | int]] = []
+    results: list[dict[str, str]] = []
+    errors = [
+        f"malformed <{match.group('tag').lower()}> tag"
+        for match in _SPACED_MANAGER_RESULT_TAG_RE.finditer(response)
+    ]
 
-def add_default_success_to_final_tag(response: str) -> str:
-    """Add success=true to a final tag that omitted the success attribute."""
-
-    def replace(match: re.Match[str]) -> str:
+    for match in _TAG_TOKEN_RE.finditer(response):
+        tag = match.group("tag").lower()
         attrs = match.group("attrs")
-        if _SUCCESS_ATTR_PRESENT_RE.search(attrs):
-            return match.group(0)
-        return f'<{match.group("tag")}{attrs} success="true">'
+        is_closing = bool(match.group("closing"))
+        is_self_closing = not is_closing and attrs.rstrip().endswith("/")
+        if is_self_closing:
+            attrs = attrs.rstrip()[:-1]
 
-    return _FINAL_OPEN_TAG_RE.sub(replace, response, count=1)
+        if is_closing:
+            if attrs.strip():
+                if tag in _MANAGER_RESULT_TAGS:
+                    errors.append(f"malformed closing <{tag}> tag")
+                continue
+
+            if not stack or stack[-1]["tag"] != tag:
+                if tag in _MANAGER_RESULT_TAGS:
+                    errors.append(f"unmatched closing <{tag}> tag")
+                continue
+
+            opening = stack.pop()
+            if opening["tag"] in _MANAGER_RESULT_TAGS and opening["depth"] == 0:
+                results.append(
+                    {
+                        "tag": str(opening["tag"]),
+                        "attrs": str(opening["attrs"]),
+                        "body": response[int(opening["body_start"]) : match.start()],
+                    }
+                )
+            continue
+
+        if is_self_closing:
+            if tag in _MANAGER_RESULT_TAGS:
+                errors.append(f"self-closing <{tag}> tag")
+            continue
+
+        depth = len(stack)
+        if tag in _MANAGER_RESULT_TAGS and depth:
+            errors.append(f"nested <{tag}> tag")
+        stack.append(
+            {
+                "tag": tag,
+                "attrs": attrs,
+                "depth": depth,
+                "body_start": match.end(),
+            }
+        )
+
+    for opening in stack:
+        if opening["tag"] in _MANAGER_RESULT_TAGS:
+            errors.append(f"unclosed <{opening['tag']}> tag")
+
+    return results, errors
 
 
 def parse_manager_response(response: str) -> dict:
@@ -116,32 +194,29 @@ def parse_manager_response(response: str) -> dict:
 
     thought = extract("thought")
     memory_section = extract_all("add_memory")
-    plan = extract("plan")
     progress_summary = extract("progress_summary")
-    plan_matches = _find_tag_matches(response, "plan")
-    final_matches = list(_FINAL_TAG_RE.finditer(response))
-    final_matches.sort(key=lambda match: match.start())
+    result_tags, result_tag_errors = _find_top_level_manager_result_tags(response)
+    plan_matches = [tag for tag in result_tags if tag["tag"] == "plan"]
+    final_matches = [tag for tag in result_tags if tag["tag"] in FINAL_RESPONSE_TAGS]
+    plan = plan_matches[0]["body"].strip() if plan_matches else ""
 
     final_match = None
     for match in final_matches:
-        if _tag_content(match):
+        if match["body"].strip():
             final_match = match
             break
     if final_match is None and final_matches:
         final_match = final_matches[0]
 
-    answer = _tag_content(final_match) if final_match else ""
+    answer = final_match["body"].strip() if final_match else ""
     success = None
     final_tag = None
-    success_attr_present = False
     if final_match:
-        final_tag = final_match.group("tag").lower()
-        final_attrs = final_match.group("attrs")
-        success_attr_present = bool(_SUCCESS_ATTR_PRESENT_RE.search(final_attrs))
-        success = _success_from_attrs(final_attrs)
+        final_tag = final_match["tag"]
+        success = _success_from_attrs(final_match["attrs"])
 
     final_counts = {
-        tag: sum(1 for match in final_matches if match.group("tag").lower() == tag)
+        tag: sum(1 for match in final_matches if match["tag"] == tag)
         for tag in FINAL_RESPONSE_TAGS
     }
 
@@ -182,9 +257,9 @@ def parse_manager_response(response: str) -> dict:
         "current_subgoal": current_subgoal,
         "answer": answer,
         "success": success,
-        "success_attr_present": success_attr_present,
         "progress_summary": progress_summary,
         "final_tag": final_tag,
+        "result_tag_errors": result_tag_errors,
         "tag_counts": {
             "plan": len(plan_matches),
             "request_accomplished": final_counts["request_accomplished"],
@@ -199,10 +274,17 @@ def validate_manager_response(parsed: dict) -> ManagerResponseValidation:
     plan = (parsed.get("plan") or "").strip()
     answer = (parsed.get("answer") or "").strip()
     success = parsed.get("success")
-    success_attr_present = bool(parsed.get("success_attr_present"))
+    result_tag_errors = parsed.get("result_tag_errors") or []
     tag_counts = parsed.get("tag_counts") or {}
     plan_count = tag_counts.get("plan", 1 if plan else 0)
     final_count = tag_counts.get("final", 1 if answer else 0)
+
+    if result_tag_errors:
+        return ManagerResponseValidation(
+            is_valid=False,
+            error_message="Manager response contains malformed or nested control tags. "
+            "Provide one complete, top-level <plan> or final answer tag.",
+        )
 
     if plan_count > 1:
         return ManagerResponseValidation(
@@ -216,7 +298,13 @@ def validate_manager_response(parsed: dict) -> ManagerResponseValidation:
             is_valid=False,
             error_message="Manager response contains multiple final answer tags. "
             "Provide exactly one <request_accomplished> or <answer> tag.",
-            can_continue_with_plan=plan_count == 1 and bool(plan),
+        )
+
+    if plan_count == 1 and final_count == 1:
+        return ManagerResponseValidation(
+            is_valid=False,
+            error_message="Manager response must provide exactly one of <plan> "
+            "or a final answer tag, not both.",
         )
 
     if plan_count == 1 and not plan:
@@ -229,24 +317,13 @@ def validate_manager_response(parsed: dict) -> ManagerResponseValidation:
         return ManagerResponseValidation(
             is_valid=False,
             error_message="Manager final answer tag must not be empty.",
-            can_continue_with_plan=plan_count == 1 and bool(plan),
-        )
-
-    if plan and answer:
-        return ManagerResponseValidation(
-            is_valid=False,
-            error_message="Manager response must provide exactly one of <plan> "
-            "or a final answer tag, not both.",
-            can_continue_with_plan=plan_count == 1 and final_count == 1,
         )
 
     if answer:
         if success is None:
             return ManagerResponseValidation(
                 is_valid=False,
-                error_message='Final answer tag must include success="true" '
-                'or success="false".',
-                can_accept_final_without_success=not success_attr_present,
+                error_message='Final answer tag must include success="true" or success="false".',
             )
         return ManagerResponseValidation(is_valid=True)
 
@@ -255,6 +332,5 @@ def validate_manager_response(parsed: dict) -> ManagerResponseValidation:
 
     return ManagerResponseValidation(
         is_valid=False,
-        error_message="Manager response must provide exactly one of <plan> "
-        "or a final answer tag.",
+        error_message="Manager response must provide exactly one of <plan> or a final answer tag.",
     )

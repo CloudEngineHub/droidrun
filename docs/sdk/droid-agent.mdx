@@ -439,7 +439,10 @@ config = MobileConfig()
 # Override default prompts with custom Jinja2 templates
 custom_prompts = {
     "fast_agent_system": "You are a specialized agent for {{ platform }} devices...",
-    "manager_system": "You are a planning agent. Your goal: {{ instruction }}..."
+    "manager_system": """You are a planning agent. Your goal: {{ instruction }}.
+Return `<thought>` followed by exactly one non-empty result tag: use `<plan>`
+while work remains, or `<request_accomplished success="true|false">` when the
+task is complete or blocked. Never include both `<plan>` and a final result tag.""",
 }
 
 agent = MobileAgent(

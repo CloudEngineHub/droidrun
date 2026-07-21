@@ -112,7 +112,11 @@ Custom tools:
 Domain: {{ variables.domain }}
 {% endif %}
 
-Output format:
+Output format: include `<thought>`, then exactly one non-empty result tag: either a
+`<plan>` while work remains, or a final `<request_accomplished>` with an explicit
+`success="true"` or `success="false"` attribute. Never include both result tags.
+
+When work remains:
 <thought>Your reasoning</thought>
 <plan>
 1. First step
@@ -120,10 +124,13 @@ Output format:
 3. DONE
 </plan>
 
-Or if complete:
-<request_accomplished>
+Or if complete (do not include `<plan>`):
+<thought>Your reasoning</thought>
+<request_accomplished success="true">
 Task is done. Answer: ...
 </request_accomplished>
+
+Use `success="false"` with an explanation instead when the task cannot be completed.
 """
 }
 
@@ -156,6 +163,10 @@ Guidelines:
 {% for rule in variables.rules %}
 - {{ rule }}
 {% endfor %}
+
+Return `<thought>` followed by exactly one non-empty result tag: use `<plan>`
+while work remains, or `<request_accomplished success="true|false">` when the
+task is complete or blocked. Never include both `<plan>` and a final result tag.
 """
 }
 
@@ -290,12 +301,19 @@ Rules:
 3. Store order confirmations in memory
 4. Never exceed budget
 
-Output:
+Output: include `<thought>`, then exactly one non-empty result tag.
+
+When work remains:
 <thought>Your reasoning</thought>
 <plan>
 1. Step
 2. DONE
 </plan>
+
+Or when the task is complete or blocked (do not include `<plan>`):
+<request_accomplished success="true|false">
+Explain the completed result or why the task could not be completed.
+</request_accomplished>
 """
 }
 

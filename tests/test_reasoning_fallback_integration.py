@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from types import SimpleNamespace
 
 import pytest
@@ -7,10 +6,7 @@ from llama_index.core.base.llms.types import ChatMessage
 
 from mobilerun.agent.manager.events import ManagerContextEvent
 from mobilerun.agent.manager.manager_agent import ManagerAgent
-from mobilerun.agent.manager.prompts import (
-    ManagerResponseValidationError,
-    parse_manager_response,
-)
+from mobilerun.agent.manager.prompts import ManagerResponseValidationError
 
 
 def _response(content: str) -> SimpleNamespace:
@@ -55,95 +51,19 @@ def _manager() -> ManagerAgent:
     return agent
 
 
-@pytest.fixture
-def mobilerun_caplog(caplog):
-    logger = logging.getLogger("mobilerun")
-    previous = logger.propagate
-    logger.propagate = True
-    caplog.set_level(logging.WARNING, logger="mobilerun")
-    yield caplog
-    logger.propagate = previous
-
-
-def test_manager_boundary_normalizes_missing_success_after_retry_exhaustion(
-    monkeypatch,
-    mobilerun_caplog,
+@pytest.mark.parametrize(
+    "invalid_response",
+    [
+        "<answer>Done</answer>",
+        "<answer success='maybe'>Done</answer>",
+        "<answer success='true'></answer>",
+        "<plan>1. Continue checking the screen.</plan><answer success='true'>Done</answer>",
+    ],
+)
+def test_manager_boundary_fails_closed_after_persistent_invalid_repair_output(
+    monkeypatch, invalid_response
 ):
     calls = []
-
-    async def fake_acall(llm, messages, stream=False):
-        calls.append((llm, messages, stream))
-        return _response("<answer>Done</answer>")
-
-    monkeypatch.setattr(
-        "mobilerun.agent.manager.manager_agent.acall_with_retries", fake_acall
-    )
-
-    manager = _manager()
-    ctx = FakeContext()
-
-    response_event = _run(manager.get_response(ctx, ManagerContextEvent()))
-    details_event = _run(manager.process_response(ctx, response_event))
-    parsed = parse_manager_response(response_event.response)
-
-    assert len(calls) == 4
-    assert parsed["answer"] == "Done"
-    assert parsed["success"] is True
-    assert details_event.answer == "Done"
-    assert details_event.success is True
-    assert any(
-        "omitted final success after retries" in record.message
-        for record in mobilerun_caplog.records
-    )
-
-
-def test_manager_boundary_rejects_malformed_success_after_retry_exhaustion(
-    monkeypatch,
-):
-    calls = []
-
-    async def fake_acall(llm, messages, stream=False):
-        calls.append((llm, messages, stream))
-        return _response("<answer success='maybe'>Done</answer>")
-
-    monkeypatch.setattr(
-        "mobilerun.agent.manager.manager_agent.acall_with_retries", fake_acall
-    )
-
-    with pytest.raises(ManagerResponseValidationError):
-        _run(_manager().get_response(FakeContext(), ManagerContextEvent()))
-
-    assert len(calls) == 4
-
-
-def test_manager_boundary_rejects_empty_final_body_after_retry_exhaustion(
-    monkeypatch,
-):
-    calls = []
-
-    async def fake_acall(llm, messages, stream=False):
-        calls.append((llm, messages, stream))
-        return _response("<answer success='true'></answer>")
-
-    monkeypatch.setattr(
-        "mobilerun.agent.manager.manager_agent.acall_with_retries", fake_acall
-    )
-
-    with pytest.raises(ManagerResponseValidationError):
-        _run(_manager().get_response(FakeContext(), ManagerContextEvent()))
-
-    assert len(calls) == 4
-
-
-def test_manager_boundary_plan_final_conflict_does_not_fallback_to_success(
-    monkeypatch,
-    mobilerun_caplog,
-):
-    calls = []
-    invalid_response = (
-        "<plan>1. Continue checking the screen.</plan>"
-        "<answer success='true'>Done</answer>"
-    )
 
     async def fake_acall(llm, messages, stream=False):
         calls.append((llm, messages, stream))
@@ -153,23 +73,55 @@ def test_manager_boundary_plan_final_conflict_does_not_fallback_to_success(
         "mobilerun.agent.manager.manager_agent.acall_with_retries", fake_acall
     )
 
+    ctx = FakeContext()
+    with pytest.raises(ManagerResponseValidationError):
+        _run(_manager().get_response(ctx, ManagerContextEvent()))
+
+    # One initial manager call and three corrective attempts; no response event
+    # exists that could reach the executor after the validation failure.
+    assert len(calls) == 4
+    assert ctx.events == []
+
+
+def test_manager_boundary_accepts_a_valid_corrective_response(monkeypatch):
+    calls = []
+
+    async def fake_acall(llm, messages, stream=False):
+        calls.append((llm, messages, stream))
+        if len(calls) == 1:
+            return _response("<answer>Done</answer>")
+        return _response("<answer success='false'>Blocked</answer>")
+
+    monkeypatch.setattr(
+        "mobilerun.agent.manager.manager_agent.acall_with_retries", fake_acall
+    )
+
     manager = _manager()
     ctx = FakeContext()
-
     response_event = _run(manager.get_response(ctx, ManagerContextEvent()))
     details_event = _run(manager.process_response(ctx, response_event))
-    parsed = parse_manager_response(response_event.response)
 
-    assert len(calls) == 4
-    assert parsed["plan"] == "1. Continue checking the screen."
-    assert parsed["answer"] == ""
-    assert parsed["success"] is None
-    assert details_event.success is None
-    assert any(
-        "continuing with the plan" in record.message
-        for record in mobilerun_caplog.records
+    assert len(calls) == 2
+    assert details_event.answer == "Blocked"
+    assert details_event.success is False
+
+
+def test_manager_boundary_fails_closed_when_corrective_provider_call_fails(monkeypatch):
+    calls = []
+
+    async def fake_acall(llm, messages, stream=False):
+        calls.append((llm, messages, stream))
+        if len(calls) == 1:
+            return _response("<answer>Done</answer>")
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(
+        "mobilerun.agent.manager.manager_agent.acall_with_retries", fake_acall
     )
-    assert not any(
-        "omitted final success after retries" in record.message
-        for record in mobilerun_caplog.records
-    )
+
+    ctx = FakeContext()
+    with pytest.raises(ManagerResponseValidationError, match="success"):
+        _run(_manager().get_response(ctx, ManagerContextEvent()))
+
+    assert len(calls) == 2
+    assert ctx.events == []

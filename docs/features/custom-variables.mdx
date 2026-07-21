@@ -25,6 +25,10 @@ Available variables:
 - {{ key }}: {{ value }}
 {% endfor %}
 {% endif %}
+
+Return `<thought>` followed by exactly one non-empty result tag: use `<plan>`
+while work remains, or `<request_accomplished success="true|false">` when the
+task is complete or blocked. Never include both `<plan>` and a final result tag.
     """
 }
 

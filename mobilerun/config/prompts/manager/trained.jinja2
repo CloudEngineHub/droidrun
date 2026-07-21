@@ -46,5 +46,5 @@ Plan actions for an Android phone task.
 
 Analyze state and plan next steps.
 
-Output: <think>, <add_memory>, <progress_summary>, <plan>
-If complete: <answer success="true|false"> instead of <plan>
+Output: <think>, <add_memory>, <progress_summary>, then exactly one non-empty <plan>
+or <answer success="true|false">. Never include both <plan> and <answer>.

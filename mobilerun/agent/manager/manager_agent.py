@@ -37,9 +37,7 @@ from mobilerun.agent.manager.events import (
 )
 from mobilerun.agent.manager.prompts import (
     ManagerResponseValidationError,
-    add_default_success_to_final_tag,
     parse_manager_response,
-    strip_manager_final_tags,
     validate_manager_response,
 )
 from mobilerun.agent.usage import get_usage_from_response
@@ -334,7 +332,8 @@ class ManagerAgent(Workflow):
             if validation.is_valid:
                 return output
 
-            error_message = f"{validation.error_message}\nRetry again."
+            validation_error = validation.error_message or "Invalid manager response."
+            error_message = f"{validation_error}\nRetry again."
             retry_count += 1
             logger.warning(
                 f"Manager response invalid (retry {retry_count}/{max_retries}): {error_message}"
@@ -353,28 +352,11 @@ class ManagerAgent(Workflow):
                 parsed = parse_manager_response(output)
             except Exception as e:
                 logger.error(f"LLM retry failed: {e}")
-                if validation.can_continue_with_plan:
-                    return strip_manager_final_tags(output)
-                if validation.can_accept_final_without_success:
-                    return add_default_success_to_final_tag(output)
-                raise ManagerResponseValidationError(error_message) from e
+                raise ManagerResponseValidationError(validation_error) from e
 
         validation = validate_manager_response(parsed)
         if validation.is_valid:
             return output
-        if validation.can_continue_with_plan:
-            logger.warning(
-                "Manager response stayed invalid after retries; continuing with the plan "
-                "and ignoring the conflicting final answer."
-            )
-            return strip_manager_final_tags(output)
-        if validation.can_accept_final_without_success:
-            logger.warning(
-                "Manager response omitted final success after retries; accepting the "
-                "terminal answer as success for backward compatibility."
-            )
-            return add_default_success_to_final_tag(output)
-
         raise ManagerResponseValidationError(
             validation.error_message or "Invalid manager response."
         )
