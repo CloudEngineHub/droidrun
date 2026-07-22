@@ -112,25 +112,28 @@ Custom tools:
 Domain: {{ variables.domain }}
 {% endif %}
 
-Output format: include `<thought>`, then exactly one non-empty result tag: either a
-`<plan>` while work remains, or a final `<request_accomplished>` with an explicit
-`success="true"` or `success="false"` attribute. Never include both result tags.
+Output format: optional `<thought>` or `<add_memory>` metadata may be included.
+Use `<plan>` while work remains. Completed tasks use
+`<request_accomplished success="true">`; blocked tasks use
+`<request_accomplished success="false">`.
 
 When work remains:
-<thought>Your reasoning</thought>
 <plan>
 1. First step
 2. Second step
-3. DONE
 </plan>
 
-Or if complete (do not include `<plan>`):
-<thought>Your reasoning</thought>
+When complete:
 <request_accomplished success="true">
 Task is done. Answer: ...
 </request_accomplished>
 
-Use `success="false"` with an explanation instead when the task cannot be completed.
+When blocked:
+<request_accomplished success="false">
+Explain why the task cannot be completed.
+</request_accomplished>
+
+For final result tags, set the `success` attribute explicitly and quote its value.
 """
 }
 
@@ -164,9 +167,10 @@ Guidelines:
 - {{ rule }}
 {% endfor %}
 
-Return `<thought>` followed by exactly one non-empty result tag: use `<plan>`
-while work remains, or `<request_accomplished success="true|false">` when the
-task is complete or blocked. Never include both `<plan>` and a final result tag.
+Optional `<thought>` or `<add_memory>` metadata may be included. Use `<plan>`
+while work remains. Completed tasks use
+`<request_accomplished success="true">`; blocked tasks use
+`<request_accomplished success="false">`.
 """
 }
 
@@ -301,19 +305,27 @@ Rules:
 3. Store order confirmations in memory
 4. Never exceed budget
 
-Output: include `<thought>`, then exactly one non-empty result tag.
+Output: optional `<thought>` or `<add_memory>` metadata may be included. Use
+`<plan>` while work remains. Completed tasks use
+`<request_accomplished success="true">`; blocked tasks use
+`<request_accomplished success="false">`.
 
 When work remains:
-<thought>Your reasoning</thought>
 <plan>
 1. Step
-2. DONE
 </plan>
 
-Or when the task is complete or blocked (do not include `<plan>`):
-<request_accomplished success="true|false">
-Explain the completed result or why the task could not be completed.
+When the task is complete:
+<request_accomplished success="true">
+Explain the completed result.
 </request_accomplished>
+
+When the task is blocked:
+<request_accomplished success="false">
+Explain why the task could not be completed.
+</request_accomplished>
+
+For final result tags, set the `success` attribute explicitly and quote its value.
 """
 }
 

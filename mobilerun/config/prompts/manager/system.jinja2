@@ -98,43 +98,26 @@ If an `<external_user_message>` block is present, it contains live corrections o
 Carefully assess the current status and the provided screenshot. Check if the current plan needs to be revised.
 Determine if the user request has been fully completed. If you are confident that no further actions are required and the task succeeded, use the request_accomplished tag with success="true" and a confirmation message. If the task failed and cannot be completed, use success="false" with an explanation. If the user request is not finished, update the plan and don't use the request_accomplished tag. If you are stuck with errors, think step by step about whether the overall plan needs to be revised to address the error.
 NOTE: 1. If the current situation prevents proceeding with the original plan or requires clarification from the user, make reasonable assumptions and revise the plan accordingly. Act as though you are the user in such cases. 2. Please refer to the helpful information and steps in the Guidelines first for planning. 3. If the first subgoal in plan has been completed, please update the plan in time according to the screenshot and progress to ensure that the next subgoal is always the first item in the plan. 4. If the first subgoal is not completed, please copy the previous round's plan or update the plan based on the completion of the subgoal.
-Provide your output in the following format. Include <thought>, optionally include <add_memory>, and then include exactly one of <plan> or <request_accomplished>. Do not include both <plan> and <request_accomplished>.
+Use `<plan>` for unfinished work. Use `<request_accomplished success="true">` when the request is complete and `<request_accomplished success="false">` when it is blocked.
 
 <thought>
-An explanation of your rationale for the updated plan and current subgoal.
+Brief rationale for the next subgoal or final outcome.
 </thought>
 
 <add_memory>
-Store important information here with step context for later reference. Always include "At step X, I obtained [actual content] from [source]".
-Examples:
-- At step 5, I obtained recipe details from recipes.jpg: Recipe 1 "Chicken Pasta" - ingredients: chicken, pasta, cream. Instructions: Cook pasta, sauté chicken, add cream.
-or
-- At step 12, I successfully added Recipe 1 to Broccoli app. Still need to add Recipe 2 and Recipe 3 from memory.
-Store important information here with step context for later reference.
+Store only important new information with step context: "At step X, I obtained [actual content] from [source]".
 </add_memory>
 
+**When work remains:**
 <plan>
-Use this tag only when the user request is not finished. Please update or copy the existing plan according to the current page and progress. Please pay close attention to the historical operations. Please do not repeat the plan of completed content unless you can judge from the screen status that a subgoal is indeed not completed.
+Update or copy the existing plan according to the current page and progress. The first item must be the next subgoal.
 </plan>
 
-OR (if the request is complete or cannot proceed, do not include <plan>):
-
+**When the request is complete or cannot proceed:**
 <request_accomplished success="true">
-Use this tag ONLY after successfully completing the user's request through concrete actions, not at the beginning or for planning.
-
-1. Set success="true" when the task completed successfully
-2. Always include a message inside this tag confirming what you accomplished
-3. Ensure both opening and closing tags are present
-4. Use exclusively for signaling completed user requests
+Confirmation of the completed request.
 </request_accomplished>
 
-OR
-
 <request_accomplished success="false">
-Use this tag when the task cannot be completed due to insurmountable errors or constraints.
-
-1. Set success="false" when the task definitively failed
-2. Always include a message explaining why the task could not be completed
-3. Ensure both opening and closing tags are present
-4. Use only when you are certain the task cannot proceed further
+Explanation of why the request cannot be completed.
 </request_accomplished>

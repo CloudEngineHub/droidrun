@@ -139,6 +139,7 @@ def _find_top_level_manager_result_tags(
                 "tag": tag,
                 "attrs": attrs,
                 "depth": depth,
+                "start": match.start(),
                 "body_start": match.end(),
             }
         )
