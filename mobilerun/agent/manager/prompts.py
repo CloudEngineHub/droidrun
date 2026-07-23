@@ -8,6 +8,8 @@ from dataclasses import dataclass
 FINAL_RESPONSE_TAGS = ("request_accomplished", "answer")
 
 _MANAGER_RESULT_TAGS = ("plan", *FINAL_RESPONSE_TAGS)
+_MANAGER_METADATA_TAGS = ("thought", "add_memory", "progress_summary")
+_MANAGER_RESPONSE_ENVELOPE_TAGS = (*_MANAGER_RESULT_TAGS, *_MANAGER_METADATA_TAGS)
 _TAG_TOKEN_RE = re.compile(
     r"""<(?P<closing>/)?(?P<tag>[A-Za-z][\w:.-]*)
     (?P<attrs>(?:[^<>"']+|"[^"]*"|'[^']*')*)>""",
@@ -86,8 +88,9 @@ def _find_top_level_manager_result_tags(
 
     Manager output is XML-like rather than a complete XML document, so a small
     stack parser is more robust than globally matching ``<plan>`` and terminal
-    tags.  In particular, control-tag-looking text inside a thought, memory,
-    or plan must not turn into a plan or final result.
+    tags.  In particular, manager response tags inside metadata or a result
+    must not turn into a top-level plan or final result.  Ordinary markup in
+    a top-level result remains body text.
     """
     stack: list[dict[str, str | int]] = []
     results: list[dict[str, str]] = []
@@ -129,6 +132,13 @@ def _find_top_level_manager_result_tags(
         if is_self_closing:
             if tag in _MANAGER_RESULT_TAGS:
                 errors.append(f"self-closing <{tag}> tag")
+            continue
+
+        has_open_top_level_result = any(
+            opening["tag"] in _MANAGER_RESULT_TAGS and opening["depth"] == 0
+            for opening in stack
+        )
+        if has_open_top_level_result and tag not in _MANAGER_RESPONSE_ENVELOPE_TAGS:
             continue
 
         depth = len(stack)

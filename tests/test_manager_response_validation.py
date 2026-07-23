@@ -59,6 +59,46 @@ def test_validate_accepts_one_nonempty_result_with_optional_metadata(response):
 
 
 @pytest.mark.parametrize(
+    ("response", "field", "expected"),
+    [
+        (
+            "<plan>1. Inspect the `<script>` element</plan>",
+            "plan",
+            "1. Inspect the `<script>` element",
+        ),
+        (
+            '<answer success="true">Found `<script>` markup.</answer>',
+            "answer",
+            "Found `<script>` markup.",
+        ),
+        (
+            "<plan>1. Inspect <em>Android 16</em> text</plan>",
+            "plan",
+            "1. Inspect <em>Android 16</em> text",
+        ),
+        (
+            '<answer success="true">Found <em>Android 16</em>.</answer>',
+            "answer",
+            "Found <em>Android 16</em>.",
+        ),
+    ],
+)
+def test_validate_accepts_markup_as_top_level_result_content(response, field, expected):
+    parsed = parse_manager_response(response)
+
+    assert validate_manager_response(parsed).is_valid
+    assert parsed[field] == expected
+
+
+def test_validate_preserves_paired_script_plan_content():
+    parsed = parse_manager_response("<plan><script>tap Settings</script></plan>")
+
+    assert validate_manager_response(parsed).is_valid
+    assert parsed["plan"] == "<script>tap Settings</script>"
+    assert parsed["current_subgoal"] == "<script>tap Settings</script>"
+
+
+@pytest.mark.parametrize(
     "response",
     [
         "",
@@ -79,6 +119,21 @@ def test_validate_rejects_unsafe_or_ambiguous_result_forms(response):
     validation = validate_manager_response(parse_manager_response(response))
 
     assert not validation.is_valid
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "<plan>1. Inspect <script><answer success='true'>Done</answer></plan>",
+        "<plan>1. Inspect <thought>details</plan>",
+        "<thought><plan>1. Open Settings</plan></thought>",
+        '<add_memory><answer success="true">Done</answer></add_memory>',
+        "<progress_summary><plan>1. Open Settings</plan></progress_summary>",
+        "<div><plan>1. Open Settings</plan></div>",
+    ],
+)
+def test_validate_rejects_results_nested_in_envelope_or_outer_markup(response):
+    assert not validate_manager_response(parse_manager_response(response)).is_valid
 
 
 def test_success_is_bound_to_the_matching_final_tag():
