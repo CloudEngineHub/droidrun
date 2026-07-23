@@ -35,7 +35,11 @@ from mobilerun.agent.manager.events import (
     ManagerPlanDetailsEvent,
     ManagerResponseEvent,
 )
-from mobilerun.agent.manager.prompts import parse_manager_response
+from mobilerun.agent.manager.prompts import (
+    ManagerResponseValidationError,
+    parse_manager_response,
+    validate_manager_response,
+)
 from mobilerun.agent.usage import get_usage_from_response
 from mobilerun.agent.utils.chat_utils import filter_empty_messages
 from mobilerun.agent.utils.inference import acall_with_retries
@@ -324,55 +328,38 @@ class ManagerAgent(Workflow):
         retry_count = 0
 
         while retry_count < max_retries:
-            error_message = None
+            validation = validate_manager_response(parsed)
+            if validation.is_valid:
+                return output
 
-            if parsed["answer"] and not parsed["plan"]:
-                if parsed["success"] is None:
-                    error_message = (
-                        'You must include success="true" or success="false" attribute '
-                        "in the <request_accomplished> tag.\n"
-                        'Example: <request_accomplished success="true">Task completed</request_accomplished>\n'
-                        "Retry again."
-                    )
-                else:
-                    break  # Valid
-            elif parsed["plan"] and parsed["answer"]:
-                error_message = (
-                    "You cannot use both request_accomplished tag while the plan is not finished. "
-                    "If you want to use request_accomplished tag, please make sure the plan is finished.\n"
-                    "Retry again."
+            validation_error = validation.error_message or "Invalid manager response."
+            error_message = f"{validation_error}\nRetry again."
+            retry_count += 1
+            logger.warning(
+                f"Manager response invalid (retry {retry_count}/{max_retries}): {error_message}"
+            )
+
+            retry_messages = messages + [
+                ChatMessage(role="assistant", content=output),
+                ChatMessage(role="user", content=error_message),
+            ]
+
+            try:
+                response = await acall_with_retries(
+                    self.llm, retry_messages, stream=self.agent_config.streaming
                 )
-            elif not parsed["plan"]:
-                error_message = (
-                    "You must provide a plan to complete the task. "
-                    "Please provide a plan with the correct format."
-                )
-            else:
-                break  # Valid: plan without answer
+                output = response.message.content
+                parsed = parse_manager_response(output)
+            except Exception as e:
+                logger.error(f"LLM retry failed: {e}")
+                raise ManagerResponseValidationError(validation_error) from e
 
-            if error_message:
-                retry_count += 1
-                logger.warning(
-                    f"Manager response invalid (retry {retry_count}/{max_retries}): {error_message}"
-                )
-
-                # Build retry messages
-                retry_messages = messages + [
-                    ChatMessage(role="assistant", content=output),
-                    ChatMessage(role="user", content=error_message),
-                ]
-
-                try:
-                    response = await acall_with_retries(
-                        self.llm, retry_messages, stream=self.agent_config.streaming
-                    )
-                    output = response.message.content
-                    parsed = parse_manager_response(output)
-                except Exception as e:
-                    logger.error(f"LLM retry failed: {e}")
-                    break
-
-        return output
+        validation = validate_manager_response(parsed)
+        if validation.is_valid:
+            return output
+        raise ManagerResponseValidationError(
+            validation.error_message or "Invalid manager response."
+        )
 
     # ========================================================================
     # Workflow Steps

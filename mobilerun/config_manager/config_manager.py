@@ -10,6 +10,9 @@ from mobilerun.config_manager.env_keys import API_KEY_ENV_VARS, load_env_key_sou
 from mobilerun.config_manager.path_resolver import PathResolver
 from mobilerun.mcp.config import MCPConfig, MCPServerConfig
 
+DEFAULT_MANAGER_SYSTEM_PROMPT = "config/prompts/manager/system.jinja2"
+DEFAULT_STATELESS_MANAGER_SYSTEM_PROMPT = "config/prompts/manager/stateless.jinja2"
+
 
 # ---------- Config Schema ----------
 @dataclass
@@ -84,7 +87,9 @@ class FastAgentConfig:
 @dataclass
 class ManagerConfig:
     vision: bool = False
-    system_prompt: str = "config/prompts/manager/system.jinja2"
+    # None selects the bundled prompt appropriate for ``stateless``. A path pins
+    # that exact template regardless of manager mode.
+    system_prompt: str | None = None
     stateless: bool = False
 
 
@@ -133,7 +138,17 @@ class AgentConfig:
         return str(PathResolver.resolve(self.fast_agent.user_prompt, must_exist=True))
 
     def get_manager_system_prompt_path(self) -> str:
-        return str(PathResolver.resolve(self.manager.system_prompt, must_exist=True))
+        prompt_path = self.manager.system_prompt
+        if prompt_path is None:
+            bundled_prompt_path = (
+                DEFAULT_STATELESS_MANAGER_SYSTEM_PROMPT
+                if self.manager.stateless
+                else DEFAULT_MANAGER_SYSTEM_PROMPT
+            )
+            # Automatic mode must select the bundled template itself rather
+            # than a same-named file in the caller's working directory.
+            prompt_path = PathResolver.get_project_root() / bundled_prompt_path
+        return str(PathResolver.resolve(prompt_path, must_exist=True))
 
     def get_executor_system_prompt_path(self) -> str:
         return str(PathResolver.resolve(self.executor.system_prompt, must_exist=True))

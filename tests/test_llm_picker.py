@@ -2,7 +2,12 @@ import logging
 
 import pytest
 
-from mobilerun.agent.utils.llm_picker import load_llm, normalize_provider_name
+from mobilerun.agent.utils.llm_picker import (
+    load_llm,
+    load_llms_from_profiles,
+    normalize_provider_name,
+)
+from mobilerun.config_manager.config_manager import LLMProfile
 
 
 @pytest.mark.parametrize(
@@ -141,6 +146,44 @@ def test_anthropic_sonnet_keeps_temperature() -> None:
 
     assert kwargs["model"] == "claude-sonnet-4-6"
     assert kwargs["temperature"] == 0.2
+
+
+def test_anthropic_uses_a_2048_token_default() -> None:
+    llm = load_llm(
+        "Anthropic",
+        model="claude-haiku-4-5",
+        api_key="stub",
+    )
+
+    assert llm.max_tokens == 2048
+    assert llm.metadata.num_output == 2048
+
+
+def test_anthropic_profile_uses_the_shared_2048_token_default() -> None:
+    llm = load_llms_from_profiles(
+        {
+            "manager": LLMProfile(
+                provider="Anthropic",
+                model="claude-haiku-4-5",
+                kwargs={"api_key": "stub"},
+            )
+        }
+    )["manager"]
+
+    assert llm.max_tokens == 2048
+
+
+@pytest.mark.parametrize("max_tokens", [512, 4096])
+def test_anthropic_preserves_explicit_max_tokens(max_tokens: int) -> None:
+    llm = load_llm(
+        "Anthropic",
+        model="claude-haiku-4-5",
+        api_key="stub",
+        max_tokens=max_tokens,
+    )
+
+    assert llm.max_tokens == max_tokens
+    assert llm.metadata.num_output == max_tokens
 
 
 @pytest.mark.parametrize(

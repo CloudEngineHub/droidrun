@@ -224,6 +224,14 @@ def _load_anthropic(**kwargs: Any) -> LLM:
                     is_function_calling_model=True,
                 )
 
+    # The upstream adapter defaults to 512 output tokens, which is too small
+    # for a manager response that includes a complete control result plus
+    # reasoning metadata.  Keep an explicit caller override intact while
+    # giving standard Anthropic usage a safe shared default.  OAuth uses its
+    # own loader above and deliberately retains its separate output limit.
+    if kwargs.get("max_tokens") is None:
+        kwargs["max_tokens"] = 2048
+
     filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
     logger.debug(
         f"Initializing MobilerunAnthropic with kwargs: {list(filtered_kwargs.keys())}"

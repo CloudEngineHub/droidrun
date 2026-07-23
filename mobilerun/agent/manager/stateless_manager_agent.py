@@ -19,7 +19,11 @@ from mobilerun.agent.manager.events import (
     ManagerPlanDetailsEvent,
     ManagerResponseEvent,
 )
-from mobilerun.agent.manager.prompts import parse_manager_response
+from mobilerun.agent.manager.prompts import (
+    ManagerResponseValidationError,
+    parse_manager_response,
+    validate_manager_response,
+)
 from mobilerun.agent.usage import get_usage_from_response
 from mobilerun.agent.utils.chat_utils import to_chat_messages
 from mobilerun.agent.utils.inference import acall_with_retries
@@ -95,6 +99,7 @@ class StatelessManagerAgent(Workflow):
     async def _build_prompt(self) -> str:
         variables = {
             "instruction": self.shared_state.instruction,
+            "platform": self.shared_state.platform,
             "device_date": self.shared_state.device_date,
             "previous_plan": self.shared_state.previous_plan,
             "previous_state": self.shared_state.previous_formatted_device_state,
@@ -124,54 +129,38 @@ class StatelessManagerAgent(Workflow):
         retry_count = 0
 
         while retry_count < max_retries:
-            error_message = None
+            validation = validate_manager_response(parsed)
+            if validation.is_valid:
+                return output
 
-            if parsed["answer"] and not parsed["plan"]:
-                if parsed["success"] is None:
-                    error_message = (
-                        'You must include success="true" or success="false" attribute '
-                        "in the <answer> or <request_accomplished> tag.\n"
-                        'Example: <answer success="true">Task completed</answer>\n'
-                        "Retry again."
-                    )
-                else:
-                    break
-            elif parsed["plan"] and parsed["answer"]:
-                error_message = (
-                    "You cannot include both <plan> and <answer> tags. "
-                    "Use <answer> only when the task is complete.\n"
-                    "Retry again."
-                )
-            elif not parsed["plan"] and not parsed["answer"]:
-                error_message = (
-                    "You must provide either a <plan> or an <answer>. "
-                    "Please provide a plan with numbered steps."
-                )
-            else:
-                break
+            validation_error = validation.error_message or "Invalid manager response."
+            error_message = f"{validation_error}\nRetry again."
+            retry_count += 1
+            logger.warning(
+                f"Manager response invalid (retry {retry_count}/{max_retries}): {error_message}"
+            )
 
-            if error_message:
-                retry_count += 1
-                logger.warning(
-                    f"Manager response invalid (retry {retry_count}/{max_retries}): {error_message}"
-                )
+            retry_messages = messages + [
+                {"role": "assistant", "content": [{"text": output}]},
+                {"role": "user", "content": [{"text": error_message}]},
+            ]
 
-                retry_messages = messages + [
-                    {"role": "assistant", "content": [{"text": output}]},
-                    {"role": "user", "content": [{"text": error_message}]},
-                ]
+            chat_messages = to_chat_messages(retry_messages)
 
-                chat_messages = to_chat_messages(retry_messages)
+            try:
+                response = await acall_with_retries(self.llm, chat_messages)
+                output = response.message.content
+                parsed = parse_manager_response(output)
+            except Exception as e:
+                logger.error(f"LLM retry failed: {e}")
+                raise ManagerResponseValidationError(validation_error) from e
 
-                try:
-                    response = await acall_with_retries(self.llm, chat_messages)
-                    output = response.message.content
-                    parsed = parse_manager_response(output)
-                except Exception as e:
-                    logger.error(f"LLM retry failed: {e}")
-                    break
-
-        return output
+        validation = validate_manager_response(parsed)
+        if validation.is_valid:
+            return output
+        raise ManagerResponseValidationError(
+            validation.error_message or "Invalid manager response."
+        )
 
     @step
     async def prepare_context(

@@ -1,7 +1,7 @@
 # Mobilerun Configuration File
 # This file is auto-generated. Edit values as needed.
 
-_version: 6
+_version: 7
 
 # === Agent Settings ===
 agent:
@@ -38,8 +38,9 @@ agent:
   manager:
     # Enable vision capabilities (screenshots)
     vision: false
-    # System prompt path (relative or absolute)
-    system_prompt: config/prompts/manager/system.jinja2
+    # null automatically selects the bundled stateful or stateless manager prompt.
+    # Set a relative or absolute path to pin a specific template.
+    system_prompt: null
     # Use stateless manager (rebuilds context each turn, no chat history, experimental)
     stateless: false
 

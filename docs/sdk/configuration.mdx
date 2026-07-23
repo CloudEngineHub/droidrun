@@ -86,11 +86,22 @@ FastAgentConfig(
 **ManagerConfig**
 ```python
 ManagerConfig(
-    vision=False,                                            # Enable screenshots
-    system_prompt="config/prompts/manager/system.jinja2",    # Path to system prompt template
-    stateless=False,                                         # Use StatelessManagerAgent (no conversation history)
+    vision=False,                 # Enable screenshots
+    system_prompt=None,           # Auto-select the bundled prompt for the selected manager mode
+    stateless=False,              # Use StatelessManagerAgent (no conversation history)
 )
 ```
+
+`manager.system_prompt: null` (or `None` in Python) selects the bundled prompt
+automatically: `config/prompts/manager/system.jinja2` for the stateful manager and
+`config/prompts/manager/stateless.jinja2` for the stateless manager. Set an explicit
+path to pin a template instead. A runtime `prompts={"manager_system": "..."}`
+template has precedence over either configured choice.
+
+Config migration v7 changes the former canonical stateful default path to `null` so
+that `stateless: true` receives the stateless prompt automatically. If you had
+intentionally pinned that exact canonical path, add it back after migration; other
+custom paths are preserved.
 
 **ExecutorConfig**
 ```python
@@ -488,7 +499,7 @@ agent:
 
   manager:
     vision: false
-    system_prompt: config/prompts/manager/system.jinja2
+    system_prompt: null  # auto-selects stateful or stateless bundled prompt
     stateless: false
 
   executor:

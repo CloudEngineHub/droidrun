@@ -112,18 +112,28 @@ Custom tools:
 Domain: {{ variables.domain }}
 {% endif %}
 
-Output format:
-<thought>Your reasoning</thought>
+Output format: optional `<thought>` or `<add_memory>` metadata may be included.
+Use `<plan>` while work remains. Completed tasks use
+`<request_accomplished success="true">`; blocked tasks use
+`<request_accomplished success="false">`.
+
+When work remains:
 <plan>
 1. First step
 2. Second step
-3. DONE
 </plan>
 
-Or if complete:
-<request_accomplished>
+When complete:
+<request_accomplished success="true">
 Task is done. Answer: ...
 </request_accomplished>
+
+When blocked:
+<request_accomplished success="false">
+Explain why the task cannot be completed.
+</request_accomplished>
+
+For final result tags, set the `success` attribute explicitly and quote its value.
 """
 }
 
@@ -156,6 +166,11 @@ Guidelines:
 {% for rule in variables.rules %}
 - {{ rule }}
 {% endfor %}
+
+Optional `<thought>` or `<add_memory>` metadata may be included. Use `<plan>`
+while work remains. Completed tasks use
+`<request_accomplished success="true">`; blocked tasks use
+`<request_accomplished success="false">`.
 """
 }
 
@@ -290,12 +305,27 @@ Rules:
 3. Store order confirmations in memory
 4. Never exceed budget
 
-Output:
-<thought>Your reasoning</thought>
+Output: optional `<thought>` or `<add_memory>` metadata may be included. Use
+`<plan>` while work remains. Completed tasks use
+`<request_accomplished success="true">`; blocked tasks use
+`<request_accomplished success="false">`.
+
+When work remains:
 <plan>
 1. Step
-2. DONE
 </plan>
+
+When the task is complete:
+<request_accomplished success="true">
+Explain the completed result.
+</request_accomplished>
+
+When the task is blocked:
+<request_accomplished success="false">
+Explain why the task could not be completed.
+</request_accomplished>
+
+For final result tags, set the `success` attribute explicitly and quote its value.
 """
 }
 
