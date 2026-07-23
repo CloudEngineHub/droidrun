@@ -10,13 +10,18 @@ FINAL_RESPONSE_TAGS = ("request_accomplished", "answer")
 _MANAGER_RESULT_TAGS = ("plan", *FINAL_RESPONSE_TAGS)
 _MANAGER_METADATA_TAGS = ("thought", "add_memory", "progress_summary")
 _MANAGER_RESPONSE_ENVELOPE_TAGS = (*_MANAGER_RESULT_TAGS, *_MANAGER_METADATA_TAGS)
+# Possessive quantifiers avoid pathological backtracking on truncated quoted attrs.
 _TAG_TOKEN_RE = re.compile(
     r"""<(?P<closing>/)?(?P<tag>[A-Za-z][\w:.-]*)
-    (?P<attrs>(?:[^<>"']+|"[^"]*"|'[^']*')*)>""",
+    (?P<attrs>(?:[^<>"']++|"[^"]*"|'[^']*')*+)>""",
     re.DOTALL | re.VERBOSE,
 )
 _SPACED_MANAGER_RESULT_TAG_RE = re.compile(
     r"""<(?:\s+/?\s*|/\s+)(?P<tag>plan|request_accomplished|answer)\b""",
+    re.IGNORECASE,
+)
+_TRAILING_UNTERMINATED_MANAGER_RESULT_TAG_RE = re.compile(
+    r"""<(?P<closing>/)?(?P<tag>plan|request_accomplished|answer)\b[^<>]*\Z""",
     re.IGNORECASE,
 )
 _ATTRIBUTE_RE = re.compile(
@@ -98,6 +103,12 @@ def _find_top_level_manager_result_tags(
         f"malformed <{match.group('tag').lower()}> tag"
         for match in _SPACED_MANAGER_RESULT_TAG_RE.finditer(response)
     ]
+    errors.extend(
+        "unterminated "
+        f"{'closing ' if match.group('closing') else ''}"
+        f"<{match.group('tag').lower()}> tag"
+        for match in _TRAILING_UNTERMINATED_MANAGER_RESULT_TAG_RE.finditer(response)
+    )
 
     for match in _TAG_TOKEN_RE.finditer(response):
         tag = match.group("tag").lower()

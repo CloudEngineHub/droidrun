@@ -124,6 +124,34 @@ def test_validate_rejects_unsafe_or_ambiguous_result_forms(response):
 @pytest.mark.parametrize(
     "response",
     [
+        '<plan>1. Open Settings</plan><answer success="true"',
+        '<plan>1. Open Settings</plan><request_accomplished success="true"',
+        '<answer success="true">Done</answer><plan',
+        '<request_accomplished success="true">Done</request_accomplished></answer',
+    ],
+)
+def test_validate_rejects_trailing_unterminated_control_tags(response):
+    parsed = parse_manager_response(response)
+
+    assert not validate_manager_response(parsed).is_valid
+    assert any("unterminated" in error for error in parsed["result_tag_errors"])
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "<plan>1. Inspect the `<script` token</plan>",
+        "<plan>1. Open Settings</plan><plans",
+        "<plan>1. Open Settings</plan><answerable",
+    ],
+)
+def test_validate_does_not_treat_non_control_markup_as_truncated_result(response):
+    assert validate_manager_response(parse_manager_response(response)).is_valid
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
         "<plan>1. Inspect <script><answer success='true'>Done</answer></plan>",
         "<plan>1. Inspect <thought>details</plan>",
         "<thought><plan>1. Open Settings</plan></thought>",
