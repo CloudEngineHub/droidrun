@@ -99,6 +99,7 @@ class StatelessManagerAgent(Workflow):
     async def _build_prompt(self) -> str:
         variables = {
             "instruction": self.shared_state.instruction,
+            "platform": self.shared_state.platform,
             "device_date": self.shared_state.device_date,
             "previous_plan": self.shared_state.previous_plan,
             "previous_state": self.shared_state.previous_formatted_device_state,

@@ -30,6 +30,7 @@ def _stateless_agent(
     agent.prompt_resolver = prompt_resolver or PromptResolver()
     agent.shared_state = SimpleNamespace(
         instruction="Read Android version",
+        platform="android",
         device_date="2026-07-22",
         previous_plan="Open Settings",
         previous_formatted_device_state="Previous UI",
@@ -72,10 +73,15 @@ def test_runtime_custom_prompt_precedes_an_explicit_manager_prompt(monkeypatch):
     assert _run(agent._build_prompt()) == "custom Current UI"
 
 
-def test_default_stateless_prompt_renders_progress_context():
-    rendered = _run(_stateless_agent(ManagerConfig(stateless=True))._build_prompt())
+@pytest.mark.parametrize("platform", ("android", "ios"))
+def test_default_stateless_prompt_renders_platform_and_progress_context(platform):
+    agent = _stateless_agent(ManagerConfig(stateless=True))
+    agent.shared_state.platform = platform
+
+    rendered = _run(agent._build_prompt())
 
     for expected_text in (
+        f"operate a {platform} device",
         "<previous_plan>\nOpen Settings",
         "<memory>\nMemory",
         "<progress_summary>\nOpened Settings",
