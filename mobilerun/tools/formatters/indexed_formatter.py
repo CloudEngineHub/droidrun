@@ -123,7 +123,7 @@ class IndexedFormatter(TreeFormatter):
             # is resized for the model; "bounds" (native pixels) drive real taps.
             bounds = element.get("displayBounds") or element.get("bounds", "")
             checkedState = element.get("checkedState", "")
-            children = element.get("children", [])
+            children = element.get("children") or []
 
             line_parts = []
             if index != "":
@@ -169,7 +169,7 @@ class IndexedFormatter(TreeFormatter):
         counter[0] += 1
 
         siblings = []
-        for child in node.get("children", []):
+        for child in node.get("children") or []:
             descendants = self._flatten_with_index(child, counter)
             siblings.append((child, descendants[0]))
             results.extend(descendants)
