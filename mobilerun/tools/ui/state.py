@@ -136,7 +136,7 @@ class UIState:
             "type": element.get("type", "unknown"),
         }
 
-        children = element.get("children", [])
+        children = element.get("children") or []
         if children:
             child_texts = [c.get("text") for c in children if c.get("text")]
             if child_texts:
@@ -194,7 +194,7 @@ class UIState:
         for item in elements:
             if item.get("index") == target:
                 return item
-            child = UIState._find_by_index(item.get("children", []), target)
+            child = UIState._find_by_index(item.get("children") or [], target)
             if child is not None:
                 return child
         return None
@@ -205,7 +205,7 @@ class UIState:
         for item in elements:
             if item.get("index") is not None:
                 indices.append(item["index"])
-            indices.extend(UIState._collect_indices(item.get("children", [])))
+            indices.extend(UIState._collect_indices(item.get("children") or []))
         return indices
 
     @staticmethod
@@ -215,5 +215,5 @@ class UIState:
         result: List[Dict[str, Any]] = []
         for item in elements:
             result.append(item)
-            result.extend(UIState._collect_all(item.get("children", [])))
+            result.extend(UIState._collect_all(item.get("children") or []))
         return result
