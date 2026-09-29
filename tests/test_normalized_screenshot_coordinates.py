@@ -5,11 +5,12 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from mobilerun.agent.utils.actions import click_area, click_at, swipe
+from mobilerun.agent.utils.actions import click_area, click_at, long_press_at, swipe
 from mobilerun.agent.utils.signatures import build_tool_registry
 from mobilerun.agent.utils.vision_sizing import model_uses_normalized_coordinates
 from mobilerun.tools.ui.provider import resize_model_screenshot_with_grid
 from mobilerun.tools.ui.screenshot_provider import ScreenshotOnlyStateProvider
+from mobilerun.tools.ui.state import UIState
 
 
 def _png(width: int = 1080, height: int = 2400) -> bytes:
@@ -109,12 +110,44 @@ def _ctx():
 def test_normalized_actions_accept_0_1000_and_tap_device_pixels() -> None:
     ctx, driver = _ctx()
 
-    assert asyncio.run(click_at(900, 920, ctx=ctx)).success
-    assert asyncio.run(click_area(0, 0, 1000, 1000, ctx=ctx)).success
-    assert asyncio.run(swipe([500, 800], [500, 200], ctx=ctx)).success
+    tap = asyncio.run(click_at(900, 920, ctx=ctx))
+    area = asyncio.run(click_area(0, 0, 1000, 1000, ctx=ctx))
+    press = asyncio.run(long_press_at(250, 750, ctx=ctx))
+    drag = asyncio.run(swipe([500, 800], [500, 200], ctx=ctx))
 
     assert driver.taps == [(972, 2208), (540, 1200)]
-    assert driver.swipes == [(540, 1920, 540, 480)]
+    assert driver.swipes == [(270, 1800, 270, 1800), (540, 1920, 540, 480)]
+    assert tap.summary == "Tapped at (900, 920)"
+    assert area.summary == "Tapped center of area at (500, 500)"
+    assert press.summary == "Long pressed at (250, 750)"
+    assert drag.summary == "Swiped from (500, 800) to (500, 200)"
+
+
+def test_pixel_action_summaries_report_device_pixels() -> None:
+    driver = _Driver()
+    provider = ScreenshotOnlyStateProvider(driver)
+    state = asyncio.run(provider.get_state())
+    ctx = SimpleNamespace(driver=driver, ui=state, state_provider=provider)
+
+    result = asyncio.run(click_at(461, 1024, ctx=ctx))
+
+    assert result.summary == f"Tapped at {driver.taps[0]}"
+    assert driver.taps[0] != (461, 1024)
+
+
+def test_normalized_clamp_only_moves_the_1000_endpoint() -> None:
+    state = UIState(
+        elements=[],
+        formatted_text="",
+        focused_text="",
+        phone_state={},
+        screen_width=1080,
+        screen_height=2400,
+        use_normalized=True,
+    )
+
+    assert state.convert_point(1000, 999) == (1079, 2397)
+    assert state.convert_point(1200, 1100) == (1296, 2640)
 
 
 @pytest.mark.parametrize("point", [(1001, 500), (500, -1)])

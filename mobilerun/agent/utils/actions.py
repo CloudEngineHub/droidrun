@@ -161,6 +161,15 @@ def _convert_action_point(
     return int(round(abs_x)), int(round(abs_y))
 
 
+def _summary_point(
+    x: int | float, y: int | float, abs_x: int, abs_y: int, *, ctx: "ActionContext"
+) -> str:
+    # Normalized callers get their own 0-1000 values back.
+    if getattr(ctx.ui, "use_normalized", False):
+        return f"({x}, {y})"
+    return f"({abs_x}, {abs_y})"
+
+
 def _macro_recorder(ctx: "ActionContext"):
     return getattr(ctx, "macro_recorder", None)
 
@@ -294,7 +303,10 @@ async def long_press_at(x: int, y: int, *, ctx: "ActionContext") -> ActionResult
             },
             pre_ui=pre_ui,
         )
-        return ActionResult(success=True, summary=f"Long pressed at ({abs_x}, {abs_y})")
+        return ActionResult(
+            success=True,
+            summary=f"Long pressed at {_summary_point(x, y, abs_x, abs_y, ctx=ctx)}",
+        )
     except Exception as e:
         return ActionResult(
             success=False, summary=f"Failed to long press at ({x}, {y}): {e}"
@@ -312,7 +324,10 @@ async def click_at(x: int, y: int, *, ctx: "ActionContext") -> ActionResult:
             {"action_type": "tap", "x": abs_x, "y": abs_y},
             pre_ui=pre_ui,
         )
-        return ActionResult(success=True, summary=f"Tapped at ({abs_x}, {abs_y})")
+        return ActionResult(
+            success=True,
+            summary=f"Tapped at {_summary_point(x, y, abs_x, abs_y, ctx=ctx)}",
+        )
     except Exception as e:
         return ActionResult(success=False, summary=f"Failed to tap at ({x}, {y}): {e}")
 
@@ -334,7 +349,11 @@ async def click_area(
             pre_ui=pre_ui,
         )
         return ActionResult(
-            success=True, summary=f"Tapped center of area at ({abs_x}, {abs_y})"
+            success=True,
+            summary=(
+                "Tapped center of area at "
+                f"{_summary_point(cx, cy, abs_x, abs_y, ctx=ctx)}"
+            ),
         )
     except Exception as e:
         return ActionResult(success=False, summary=f"Failed to tap area center: {e}")
@@ -454,7 +473,11 @@ async def swipe(
         )
         return ActionResult(
             success=True,
-            summary=f"Swiped from ({start_x}, {start_y}) to ({end_x}, {end_y})",
+            summary=(
+                "Swiped from "
+                f"{_summary_point(*coordinate, start_x, start_y, ctx=ctx)} to "
+                f"{_summary_point(*coordinate2, end_x, end_y, ctx=ctx)}"
+            ),
         )
     except Exception as e:
         return ActionResult(success=False, summary=f"Failed to swipe: {e}")

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from mobilerun.tools.helpers.coordinate import to_absolute
+from mobilerun.tools.helpers.coordinate import NORMALIZED_MAX, to_absolute
 from mobilerun.tools.helpers.geometry import (
     find_clear_point,
     find_uncovered_point,
@@ -181,10 +181,11 @@ class UIState:
         if self.use_normalized:
             abs_x, abs_y = to_absolute(x, y, self.screen_width, self.screen_height)
             # 1000 maps to one past the last pixel; keep it on screen.
-            return (
-                min(abs_x, max(self.screen_width - 1, 0)),
-                min(abs_y, max(self.screen_height - 1, 0)),
-            )
+            if x == NORMALIZED_MAX:
+                abs_x = max(self.screen_width - 1, 0)
+            if y == NORMALIZED_MAX:
+                abs_y = max(self.screen_height - 1, 0)
+            return abs_x, abs_y
         return (
             int(round(x * self.coordinate_scale_x)),
             int(round(y * self.coordinate_scale_y)),

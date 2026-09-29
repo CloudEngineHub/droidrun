@@ -86,6 +86,8 @@ mobilerun run "Check Wi-Fi" \
 ```
 
 In screenshot-only mode, Mobilerun does not read an accessibility tree. The agent uses coordinate actions, swipe, supported system buttons, and direct text typing based on screenshots. App launch support depends on the selected backend.
+
+Coordinates use the screenshot's pixel space. With Gemma models, the agent uses normalized coordinates instead: 0-1000 on both axes, with no grid drawn on the screenshot. Set `agent.use_normalized_coordinates: true` in `config.yaml` to use normalized coordinates with any model.
   </Tab>
 
   <Tab title="LLM Providers">
