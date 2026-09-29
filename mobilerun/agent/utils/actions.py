@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from mobilerun.agent.action_result import ActionResult
 from mobilerun.agent.oneflows.app_starter_workflow import AppStarter
+from mobilerun.tools.helpers.coordinate import NORMALIZED_MAX
 
 logger = logging.getLogger("mobilerun")
 
@@ -30,6 +31,12 @@ def _uses_screenshot_only_coordinates(ctx: "ActionContext") -> bool:
 
 
 def _screenshot_only_coordinate_error(ctx: "ActionContext") -> str:
+    if getattr(ctx.ui, "use_normalized", False):
+        return (
+            "Coordinates must be normalized values from 0 to 1000 on both axes "
+            "in screenshot-only mode. Observe the screenshot and retry with "
+            "normalized coordinates."
+        )
     width = getattr(ctx.ui, "screen_width", None)
     height = getattr(ctx.ui, "screen_height", None)
     if width and height:
@@ -58,6 +65,11 @@ def _validate_screenshot_only_point(
         raise ValueError(_screenshot_only_coordinate_error(ctx)) from exc
     except ValueError as exc:
         raise ValueError(_screenshot_only_coordinate_error(ctx)) from exc
+
+    if getattr(ctx.ui, "use_normalized", False):
+        if not (0 <= px <= NORMALIZED_MAX and 0 <= py <= NORMALIZED_MAX):
+            raise ValueError(_screenshot_only_coordinate_error(ctx))
+        return
 
     out_of_range = (
         width <= 0 or height <= 0 or px < 0 or px >= width or py < 0 or py >= height

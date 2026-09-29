@@ -184,9 +184,13 @@ def resize_model_screenshot_with_grid(state_provider: Any, screenshot: bytes) ->
     dims are available (e.g. injected screenshot-only providers)."""
     width = getattr(state_provider, "model_screenshot_width", None)
     height = getattr(state_provider, "model_screenshot_height", None)
+    # A pixel grid contradicts a normalized coordinate contract.
+    divisions = 10 if getattr(state_provider, "model_screenshot_grid", True) else 0
     if width and height:
-        return resize_image_to_dimensions_with_grid(screenshot, width, height)
-    return resize_image_to_max_side_with_grid(screenshot)
+        return resize_image_to_dimensions_with_grid(
+            screenshot, width, height, divisions=divisions
+        )
+    return resize_image_to_max_side_with_grid(screenshot, divisions=divisions)
 
 
 class AndroidStateProvider(StateProvider):

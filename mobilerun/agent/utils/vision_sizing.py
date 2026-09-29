@@ -34,6 +34,14 @@ def _is_anthropic(model_id: str) -> bool:
     return model_id.startswith("claude")
 
 
+def model_uses_normalized_coordinates(model_id: str) -> bool:
+    """Whether the model answers screenshot positions on a 0-1000 grid.
+
+    Gemma grounds in normalized coordinates and ignores a declared pixel space.
+    """
+    return "gemma" in model_id.lower()
+
+
 def model_effective_dims(model_id: str, width: int, height: int) -> tuple[int, int]:
     """Exact dims a single model grounds on for a native ``width``x``height`` screen."""
     base_w, base_h = fit_dimensions_to_max_side(

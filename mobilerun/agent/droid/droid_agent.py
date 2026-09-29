@@ -72,7 +72,10 @@ from mobilerun.agent.utils.tracing_setup import (
     setup_tracing,
 )
 from mobilerun.agent.utils.trajectory import Trajectory
-from mobilerun.agent.utils.vision_sizing import VisionResizePolicy
+from mobilerun.agent.utils.vision_sizing import (
+    VisionResizePolicy,
+    model_uses_normalized_coordinates,
+)
 from mobilerun.config_manager.config_manager import (
     DEFAULT_DISABLED_TOOLS,
     AgentConfig,
@@ -611,6 +614,16 @@ class MobileAgent(Workflow):
         vision_resize_policy = VisionResizePolicy.from_llms(
             vision_llms, max_side_cap=self.config.agent.model_screenshot_max_side
         )
+        # The agent that emits coordinate actions decides the screenshot space.
+        coordinate_llm = (
+            self.executor_llm if self.config.agent.reasoning else self.fast_agent_llm
+        )
+        screenshot_normalized = self.config.agent.use_normalized_coordinates or (
+            any(llm is coordinate_llm for llm in vision_llms)
+            and model_uses_normalized_coordinates(
+                str(getattr(coordinate_llm, "model", "") or "")
+            )
+        )
 
         is_ios = self.resolved_device_config.platform.lower() == "ios"
         control_backend = _normalize_control_backend(
@@ -690,8 +703,12 @@ class MobileAgent(Workflow):
             self.state_provider = self._injected_state_provider
         elif self.config.agent.vision_only or is_visual_remote:
             self.state_provider = ScreenshotOnlyStateProvider(
-                driver, vision_resize_policy=vision_resize_policy
+                driver,
+                vision_resize_policy=vision_resize_policy,
+                use_normalized=screenshot_normalized,
             )
+            if screenshot_normalized:
+                logger.info("📐 Screenshot coordinates: normalized 0-1000")
         elif is_ios_portal_http:
             # The --local portal serves the Android-shaped state (a11y_tree
             # node JSON + point-space screen_bounds), so it pairs with the
@@ -736,6 +753,9 @@ class MobileAgent(Workflow):
                 self.state_provider,
                 "requires_coordinate_tools",
                 False,
+            ),
+            normalized_coordinates=getattr(
+                self.state_provider, "use_normalized", False
             ),
         )
 
