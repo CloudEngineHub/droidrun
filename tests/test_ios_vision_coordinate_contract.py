@@ -403,3 +403,23 @@ def test_empty_state_from_ui_tree_failure_refuses_coordinate_actions():
         _convert_action_point(
             10, 20, ctx=SimpleNamespace(ui=state, state_provider=provider)
         )
+
+
+def test_normalized_mode_shows_normalized_bounds_and_taps_points():
+    driver = FakeIOSDriver(screenshot_bytes=_png(8, 8))
+    provider = IOSStateProvider(driver, use_normalized=True)
+    state = _state(provider)
+
+    element = _general_element(state)
+    assert element["bounds"] == "20,200,420,244"
+    assert element["displayBounds"] == "45,209,954,255"
+    assert "(normalized [0-1000])" in state.formatted_text
+    assert "(45,209,954,255)" in state.formatted_text
+    assert "(20,200,420,244)" not in state.formatted_text
+    # element taps keep points
+    assert state.get_element_coords(element["index"]) == (220, 222)
+    # the displayed center fed back through a coordinate action lands inside
+    ctx = SimpleNamespace(ui=state, state_provider=provider)
+    x, y = _convert_action_point(499, 232, ctx=ctx)
+    assert 20 <= x < 420 and 200 <= y < 244
+    assert driver.screenshot_calls == 0

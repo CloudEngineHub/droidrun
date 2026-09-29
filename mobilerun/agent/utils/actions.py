@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 from mobilerun.agent.action_result import ActionResult
 from mobilerun.agent.oneflows.app_starter_workflow import AppStarter
-from mobilerun.tools.helpers.coordinate import NORMALIZED_MAX
+from mobilerun.tools.helpers.coordinate import NORMALIZED_MAX, to_normalized
 
 logger = logging.getLogger("mobilerun")
 
@@ -170,6 +170,14 @@ def _summary_point(
     return f"({abs_x}, {abs_y})"
 
 
+def _element_summary_point(x: int, y: int, *, ctx: "ActionContext") -> str:
+    # Element taps are device units; normalized callers see 0-1000.
+    ui = ctx.ui
+    if getattr(ui, "use_normalized", False) and ui.screen_width and ui.screen_height:
+        x, y = to_normalized(x, y, ui.screen_width, ui.screen_height)
+    return f"({x}, {y})"
+
+
 def _macro_recorder(ctx: "ActionContext"):
     return getattr(ctx, "macro_recorder", None)
 
@@ -247,7 +255,7 @@ async def click(index: int, *, ctx: "ActionContext") -> ActionResult:
         ]
         if info.get("child_texts"):
             detail_parts.append(f"Contains text: {' | '.join(info['child_texts'])}")
-        detail_parts.append(f"Coordinates: ({x}, {y})")
+        detail_parts.append(f"Coordinates: {_element_summary_point(x, y, ctx=ctx)}")
 
         return ActionResult(
             success=True, summary=f"Clicked on {' | '.join(detail_parts)}"
@@ -277,7 +285,11 @@ async def long_press(index: int, *, ctx: "ActionContext") -> ActionResult:
             pre_ui=pre_ui,
         )
         return ActionResult(
-            success=True, summary=f"Long pressed element at index {index} at ({x}, {y})"
+            success=True,
+            summary=(
+                f"Long pressed element at index {index} at "
+                f"{_element_summary_point(x, y, ctx=ctx)}"
+            ),
         )
     except ValueError as e:
         return ActionResult(

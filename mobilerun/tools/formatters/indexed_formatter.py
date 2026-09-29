@@ -119,8 +119,8 @@ class IndexedFormatter(TreeFormatter):
             class_name = element.get("className", "")
             resource_id = element.get("resourceId", "")
             text = element.get("text", "")
-            # Model-facing text shows display-space bounds when the screenshot
-            # is resized for the model; "bounds" (native pixels) drive real taps.
+            # Model-facing text shows display-space or normalized bounds;
+            # "bounds" (native pixels) drive real taps.
             bounds = element.get("displayBounds") or element.get("bounds", "")
             checkedState = element.get("checkedState", "")
             children = element.get("children") or []
@@ -218,7 +218,7 @@ class IndexedFormatter(TreeFormatter):
 
         display_bounds_str = None
         if self.use_normalized and self.screen_width and self.screen_height:
-            bounds_str = bounds_to_normalized(
+            display_bounds_str = bounds_to_normalized(
                 bounds_str, self.screen_width, self.screen_height
             )
         elif self.display_scale_x != 1.0 or self.display_scale_y != 1.0:

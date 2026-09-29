@@ -115,10 +115,9 @@ class UIState:
             return point
         left, top, right, bottom = map(int, element["bounds"].split(","))
         if self.screen_width and self.screen_height:
-            width = 1000 if self.use_normalized else self.screen_width
-            height = 1000 if self.use_normalized else self.screen_height
             left, top = max(0, left), max(0, top)
-            right, bottom = min(width, right), min(height, bottom)
+            right = min(self.screen_width, right)
+            bottom = min(self.screen_height, bottom)
         clear = find_uncovered_point((left, top, right, bottom), blockers)
         if clear is None:
             raise ValueError(f"No clear tap point for element {element.get('index')}")

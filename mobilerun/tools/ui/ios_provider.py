@@ -4,7 +4,7 @@ Parses the raw text-based accessibility tree returned by the iOS portal
 into structured elements compatible with UIState.
 
 Known limitations:
-- Normalized coordinates untested on iOS
+- Normalized coordinates untested on real iOS devices
 - No filter/formatter pipeline (iOS UIState still formats from raw a11y text)
 """
 
@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from mobilerun_core_local.driver.base import DeviceDisconnectedError, DeviceDriver
 
+from mobilerun.tools.helpers.coordinate import bounds_to_normalized
 from mobilerun.tools.helpers.images import (
     fit_dimensions_to_max_side,
     image_dimensions,
@@ -192,8 +193,16 @@ class IOSStateProvider(StateProvider):
                         strict=True,
                     )
                 )
+        elif self.use_normalized and screen_width and screen_height:
+            # Model-facing bounds in 0-1000; "bounds" (points) keep driving taps.
+            for element in elements:
+                element["displayBounds"] = bounds_to_normalized(
+                    element["bounds"], screen_width, screen_height
+                )
 
-        formatted_text = _format_elements(elements, screen_width, screen_height)
+        formatted_text = _format_elements(
+            elements, screen_width, screen_height, normalized=self.use_normalized
+        )
 
         if display_width and display_height:
             formatted_text += (
@@ -374,19 +383,21 @@ def _format_elements(
     elements: List[Dict[str, Any]],
     screen_width: int,
     screen_height: int,
+    normalized: bool = False,
 ) -> str:
     """Build the text representation shown to the agent."""
+    coord_note = " (normalized [0-1000])" if normalized else ""
     schema = "'index. className: text - bounds(x1,y1,x2,y2)'"
     if not elements:
-        return f"Current UI elements:\n{schema}:\nNo UI elements found"
+        return f"Current UI elements{coord_note}:\n{schema}:\nNo UI elements found"
 
-    lines = [f"Current UI elements:\n{schema}:"]
+    lines = [f"Current UI elements{coord_note}:\n{schema}:"]
     for el in elements:
         idx = el.get("index", 0)
         cls = el.get("className", "Unknown")
         text = el.get("text", "")
-        # Model-facing text shows display-space bounds when the screenshot is
-        # resized for the model; "bounds" (points) drive real taps.
+        # Model-facing text shows display-space or normalized bounds;
+        # "bounds" (points) drive real taps.
         bounds = el.get("displayBounds") or el.get("bounds", "")
 
         parts = [f"{idx}. {cls}:"]
