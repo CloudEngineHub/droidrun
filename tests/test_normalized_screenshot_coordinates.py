@@ -268,3 +268,183 @@ def test_normalized_config_applies_to_vision_only(monkeypatch) -> None:
     )
 
     assert agent.state_provider.use_normalized is True
+
+
+def _a11y_config(*, reasoning: bool = False, vision: bool = True):
+    from mobilerun.config_manager.config_manager import (
+        AgentConfig,
+        ExecutorConfig,
+        FastAgentConfig,
+        ManagerConfig,
+    )
+
+    return AgentConfig(
+        reasoning=reasoning,
+        fast_agent=FastAgentConfig(vision=vision),
+        manager=ManagerConfig(vision=vision),
+        executor=ExecutorConfig(vision=vision),
+    )
+
+
+@pytest.mark.parametrize("reasoning", [False, True])
+def test_a11y_vision_gemma_agent_uses_normalized_coordinates(
+    monkeypatch, reasoning: bool
+) -> None:
+    from mobilerun.tools.ui.provider import AndroidStateProvider
+
+    agent, registry_kwargs = _start_agent(
+        monkeypatch,
+        model="gemma4:latest",
+        config=_a11y_config(reasoning=reasoning),
+    )
+
+    assert isinstance(agent.state_provider, AndroidStateProvider)
+    assert agent.state_provider.use_normalized is True
+    assert registry_kwargs["screenshot_only"] is False
+    assert registry_kwargs["normalized_coordinates"] is True
+
+
+@pytest.mark.parametrize(
+    ("model", "vision"), [("gemma4:latest", False), ("gpt-6-astra", True)]
+)
+def test_a11y_agent_keeps_pixel_coordinates_without_gemma_vision(
+    monkeypatch, model: str, vision: bool
+) -> None:
+    agent, registry_kwargs = _start_agent(
+        monkeypatch, model=model, config=_a11y_config(vision=vision)
+    )
+
+    assert agent.state_provider.use_normalized is False
+    assert registry_kwargs["normalized_coordinates"] is False
+
+
+def _a11y_context(*, vision: bool, screen=(1080, 2400)):
+    from unittest.mock import AsyncMock
+
+    from mobilerun.tools.filters import ConciseFilter
+    from mobilerun.tools.formatters import IndexedFormatter
+    from mobilerun.tools.ui.provider import AndroidStateProvider
+
+    def node(text, bounds, children=()):
+        return {
+            "text": text,
+            "className": "android.widget.Button",
+            "boundsInScreen": dict(
+                zip(("left", "top", "right", "bottom"), bounds, strict=True)
+            ),
+            "isClickable": True,
+            "isVisibleToUser": True,
+            "children": list(children),
+        }
+
+    raw = {
+        "a11y_tree": node(
+            "root", (0, 0, 1080, 2400), [node("Send", (930, 2150, 1050, 2270))]
+        ),
+        "phone_state": {},
+        "device_context": {
+            "screen_bounds": dict(zip(("width", "height"), screen, strict=True))
+        },
+    }
+    driver = SimpleNamespace(
+        get_ui_tree=AsyncMock(return_value=raw), tap=AsyncMock(), swipe=AsyncMock()
+    )
+    provider = AndroidStateProvider(
+        driver,
+        ConciseFilter(),
+        IndexedFormatter(),
+        use_normalized=True,
+        vision_enabled=vision,
+    )
+    ui = asyncio.run(provider.get_state())
+    return SimpleNamespace(ui=ui, driver=driver, state_provider=provider)
+
+
+@pytest.mark.parametrize("vision", [True, False])
+def test_normalized_a11y_vision_declares_0_1000_and_enables_click_at(
+    vision: bool,
+) -> None:
+    from mobilerun.agent.droid.droid_agent import _effective_disabled_tools
+    from mobilerun.config_manager.config_manager import DEFAULT_DISABLED_TOOLS
+
+    ctx = _a11y_context(vision=vision)
+    effective = _effective_disabled_tools(
+        list(DEFAULT_DISABLED_TOOLS), ctx.state_provider, vision_enabled=vision
+    )
+
+    assert "(861,895,972,945)" in ctx.ui.formatted_text
+    assert ("normalized 0-1000 on both axes" in ctx.ui.formatted_text) is vision
+    assert ("click_at" in effective) is not vision
+    assert ctx.state_provider.resize_model_screenshot is False
+
+
+def test_normalized_a11y_click_at_rejects_points_outside_0_1000() -> None:
+    ctx = _a11y_context(vision=True)
+
+    inside = asyncio.run(click_at(1000, 1000, ctx=ctx))
+    outside = asyncio.run(click_at(1001, 5, ctx=ctx))
+    drag = asyncio.run(swipe([500, 800], [500, -1], ctx=ctx))
+
+    assert inside.success
+    ctx.driver.tap.assert_awaited_once_with(1079, 2399)
+    assert outside.success is False
+    assert "outside the normalized 0-1000 range" in outside.summary
+    assert drag.success is False
+    ctx.driver.swipe.assert_not_awaited()
+
+
+def test_normalized_a11y_refuses_coordinates_without_a_screen_size() -> None:
+    ctx = _a11y_context(vision=True, screen=(0, 0))
+
+    tap = asyncio.run(click_at(500, 500, ctx=ctx))
+    drag = asyncio.run(swipe([500, 800], [500, 200], ctx=ctx))
+
+    assert tap.success is False and drag.success is False
+    assert "unavailable for this step" in tap.summary
+    ctx.driver.tap.assert_not_awaited()
+    ctx.driver.swipe.assert_not_awaited()
+
+
+def test_shared_gemma_llm_without_executor_vision_keeps_pixel_coordinates(
+    monkeypatch,
+) -> None:
+    from mobilerun.config_manager.config_manager import (
+        AgentConfig,
+        ExecutorConfig,
+        ManagerConfig,
+    )
+
+    agent, _ = _start_agent(
+        monkeypatch,
+        model="gemma4:latest",
+        config=AgentConfig(
+            reasoning=True,
+            manager=ManagerConfig(vision=True),
+            executor=ExecutorConfig(vision=False),
+        ),
+    )
+
+    assert agent.manager_llm is agent.executor_llm
+    assert agent.state_provider.use_normalized is False
+
+
+def test_gemma_executor_with_its_own_vision_uses_normalized_coordinates(
+    monkeypatch,
+) -> None:
+    from mobilerun.config_manager.config_manager import (
+        AgentConfig,
+        ExecutorConfig,
+        ManagerConfig,
+    )
+
+    agent, _ = _start_agent(
+        monkeypatch,
+        model="gemma4:latest",
+        config=AgentConfig(
+            reasoning=True,
+            manager=ManagerConfig(vision=False),
+            executor=ExecutorConfig(vision=True),
+        ),
+    )
+
+    assert agent.state_provider.use_normalized is True

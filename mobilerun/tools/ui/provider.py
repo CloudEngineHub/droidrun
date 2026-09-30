@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from mobilerun_core_local.driver.base import DeviceDisconnectedError
 
+from mobilerun.tools.helpers.coordinate import NORMALIZED_STATE_NOTE
 from mobilerun.tools.helpers.images import (
     fit_dimensions_to_max_side,
     resize_image_to_dimensions_with_grid,
@@ -227,12 +228,9 @@ class AndroidStateProvider(StateProvider):
         # get_state); read by resize_model_screenshot_with_grid.
         self.model_screenshot_width: Optional[int] = None
         self.model_screenshot_height: Optional[int] = None
-        # Android screenshots and input taps share device-pixel coordinates,
-        # but only when not in normalized mode. ``use_normalized=True`` makes
-        # ``UIState.convert_point`` treat inputs as [0-1000] normalized
-        # coordinates, which is incompatible with picking coordinates off the
-        # screenshot — keep click_at masked in that case.
-        self.screenshot_matches_input_coords = not use_normalized
+        # Model coordinates reach device pixels either 1:1, through the vision
+        # contract's scaling, or through normalized [0-1000] conversion.
+        self.screenshot_matches_input_coords = True
         # Normalized [0-1000] coordinates are scale-invariant, so the
         # deterministic-space contract is only needed for pixel coordinates.
         # Re-evaluated per get_state: the flag must describe the CURRENT
@@ -244,8 +242,8 @@ class AndroidStateProvider(StateProvider):
         # Hybrid vision exposes click_at when a coordinate contract is
         # expected, but individual states can still arrive with missing or
         # zero screen bounds. Refuse coordinate actions for those snapshots
-        # instead of treating model coordinates as native device pixels.
-        self.requires_active_contract_for_coords = self._vision_contract_intent
+        # instead of mapping model coordinates against a wrong screen size.
+        self.requires_active_contract_for_coords = vision_enabled
 
     async def _recover_portal(self) -> None:
         """Restart Portal's accessibility service and TCP socket server."""
@@ -352,6 +350,13 @@ class AndroidStateProvider(StateProvider):
             self.tree_formatter.format(filtered, combined_data["phone_state"])
         )
 
+        if (
+            self.use_normalized
+            and self.vision_enabled
+            and screen_width
+            and screen_height
+        ):
+            formatted_text += f"\n\n{NORMALIZED_STATE_NOTE}"
         if display_width and display_height:
             scaled_note = (
                 f" — the {screen_width}x{screen_height} device screen scaled down"
@@ -377,7 +382,8 @@ class AndroidStateProvider(StateProvider):
             use_normalized=self.use_normalized,
             coordinate_scale_x=coordinate_scale_x,
             coordinate_scale_y=coordinate_scale_y,
-            coordinate_contract_active=bool(display_width and display_height),
+            coordinate_contract_active=bool(display_width and display_height)
+            or bool(self.use_normalized and screen_width and screen_height),
             model_screenshot_width=display_width,
             model_screenshot_height=display_height,
         )

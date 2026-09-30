@@ -247,9 +247,9 @@ def _effective_disabled_tools(
         return [name for name in disabled_tools if name not in _COORDINATE_TOOL_NAMES]
     # Auto-unmask click_at only when (a) the caller didn't supply an explicit
     # list, and (b) the provider maps model-visible coordinates to the
-    # driver's tap input space (directly, or via the vision coordinate
-    # contract's convert_point scaling — both Android and iOS set the flag
-    # accordingly). Normalized mode keeps click_at masked.
+    # driver's tap input space (directly, via the vision coordinate
+    # contract's convert_point scaling, or via normalized 0-1000 conversion —
+    # both Android and iOS set the flag accordingly).
     coords_align = getattr(state_provider, "screenshot_matches_input_coords", False)
     if vision_enabled and not explicit and coords_align:
         return [name for name in disabled_tools if name != "click_at"]
@@ -614,12 +614,29 @@ class MobileAgent(Workflow):
         vision_resize_policy = VisionResizePolicy.from_llms(
             vision_llms, max_side_cap=self.config.agent.model_screenshot_max_side
         )
-        # The agent that emits coordinate actions decides the screenshot space.
+        # In reasoning mode the Executor only sees a screenshot when the Manager
+        # also captured one (manager.vision=True), so require both before
+        # exposing coordinate clicks.
+        if self.config.agent.reasoning:
+            active_action_vision = (
+                self.config.agent.manager.vision and self.config.agent.executor.vision
+            )
+        else:
+            active_action_vision = self.config.agent.fast_agent.vision
+        action_agent_has_vision = self.config.agent.vision_only or active_action_vision
+        # The agent that emits coordinate actions decides the coordinate space.
+        # Its own vision flag counts: the Manager also captures screenshots for
+        # trajectories and streaming.
         coordinate_llm = (
             self.executor_llm if self.config.agent.reasoning else self.fast_agent_llm
         )
-        screenshot_normalized = self.config.agent.use_normalized_coordinates or (
-            any(llm is coordinate_llm for llm in vision_llms)
+        coordinate_agent_vision = self.config.agent.vision_only or (
+            self.config.agent.executor.vision
+            if self.config.agent.reasoning
+            else self.config.agent.fast_agent.vision
+        )
+        use_normalized = self.config.agent.use_normalized_coordinates or (
+            coordinate_agent_vision
             and model_uses_normalized_coordinates(
                 str(getattr(coordinate_llm, "model", "") or "")
             )
@@ -705,10 +722,8 @@ class MobileAgent(Workflow):
             self.state_provider = ScreenshotOnlyStateProvider(
                 driver,
                 vision_resize_policy=vision_resize_policy,
-                use_normalized=screenshot_normalized,
+                use_normalized=use_normalized,
             )
-            if screenshot_normalized:
-                logger.info("📐 Screenshot coordinates: normalized 0-1000")
         elif is_ios_portal_http:
             # The --local portal serves the Android-shaped state (a11y_tree
             # node JSON + point-space screen_bounds), so it pairs with the
@@ -718,7 +733,7 @@ class MobileAgent(Workflow):
                 driver,
                 tree_filter=tree_filter,
                 tree_formatter=IndexedFormatter(),
-                use_normalized=self.config.agent.use_normalized_coordinates,
+                use_normalized=use_normalized,
                 stealth=False,
                 vision_enabled=vision_enabled,
                 vision_resize_policy=vision_resize_policy,
@@ -726,7 +741,7 @@ class MobileAgent(Workflow):
         elif is_ios:
             self.state_provider = IOSStateProvider(
                 driver,
-                use_normalized=self.config.agent.use_normalized_coordinates,
+                use_normalized=use_normalized,
                 vision_enabled=vision_enabled,
                 vision_resize_policy=vision_resize_policy,
             )
@@ -737,11 +752,14 @@ class MobileAgent(Workflow):
                 driver,
                 tree_filter=tree_filter,
                 tree_formatter=tree_formatter,
-                use_normalized=self.config.agent.use_normalized_coordinates,
+                use_normalized=use_normalized,
                 stealth=stealth_enabled,
                 vision_enabled=vision_enabled,
                 vision_resize_policy=vision_resize_policy,
             )
+
+        if getattr(self.state_provider, "use_normalized", False):
+            logger.info("📐 Coordinates: normalized 0-1000")
 
         # ── 3. Build tool registry ────────────────────────────────────
         registry, standard_tool_names = await build_tool_registry(
@@ -782,16 +800,6 @@ class MobileAgent(Workflow):
         disabled_tools = list(
             user_disabled if explicit_disabled else DEFAULT_DISABLED_TOOLS
         )
-        # In reasoning mode the Executor only sees a screenshot when the Manager
-        # also captured one (manager.vision=True), so require both before
-        # exposing coordinate clicks.
-        if self.config.agent.reasoning:
-            active_action_vision = (
-                self.config.agent.manager.vision and self.config.agent.executor.vision
-            )
-        else:
-            active_action_vision = self.config.agent.fast_agent.vision
-        action_agent_has_vision = self.config.agent.vision_only or active_action_vision
         disabled_tools = _effective_disabled_tools(
             disabled_tools,
             self.state_provider,

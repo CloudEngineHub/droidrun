@@ -16,7 +16,10 @@ from typing import Any, Dict, List, Optional
 
 from mobilerun_core_local.driver.base import DeviceDisconnectedError, DeviceDriver
 
-from mobilerun.tools.helpers.coordinate import bounds_to_normalized
+from mobilerun.tools.helpers.coordinate import (
+    NORMALIZED_STATE_NOTE,
+    bounds_to_normalized,
+)
 from mobilerun.tools.helpers.images import (
     fit_dimensions_to_max_side,
     image_dimensions,
@@ -83,14 +86,16 @@ class IOSStateProvider(StateProvider):
         self.resize_model_screenshot = self._vision_contract_intent
         # Without the contract, iOS screenshots (physical pixels) do not map
         # to tap input (points), so coordinate tools stay masked. With the
-        # contract active, convert_point maps the model's display-space
-        # coordinates to points, making click_at safe to auto-enable.
-        self.screenshot_matches_input_coords = self._vision_contract_intent
+        # contract active, or in normalized mode, convert_point maps the
+        # model's coordinates to points, making click_at safe to auto-enable.
+        self.screenshot_matches_input_coords = (
+            self._vision_contract_intent or use_normalized
+        )
         # Coordinate actions are only safe while the contract is active (iOS
         # taps use points, not screenshot pixels). Action-time guards refuse
         # them on a state without it. See
         # actions._require_active_coordinate_contract.
-        self.requires_active_contract_for_coords = self._vision_contract_intent
+        self.requires_active_contract_for_coords = vision_enabled
 
     async def get_state(self) -> UIState:
         try:
@@ -129,6 +134,13 @@ class IOSStateProvider(StateProvider):
         screen_bounds = device_context.get("screen_bounds", {})
         screen_width = int(screen_bounds.get("width", 390))
         screen_height = int(screen_bounds.get("height", 844))
+
+        # Normalized coordinates need the real screen size, not the defaults.
+        normalized_ready = bool(
+            self.use_normalized
+            and screen_bounds.get("width")
+            and screen_bounds.get("height")
+        )
 
         # Vision coordinate contract: the screenshot agents attach is resized
         # (with a labeled grid) into a display space derived from the actual
@@ -193,7 +205,7 @@ class IOSStateProvider(StateProvider):
                         strict=True,
                     )
                 )
-        elif self.use_normalized and screen_width and screen_height:
+        elif normalized_ready:
             # Model-facing bounds in 0-1000; "bounds" (points) keep driving taps.
             for element in elements:
                 element["displayBounds"] = bounds_to_normalized(
@@ -203,6 +215,8 @@ class IOSStateProvider(StateProvider):
         formatted_text = _format_elements(
             elements, screen_width, screen_height, normalized=self.use_normalized
         )
+        if normalized_ready and self.vision_enabled:
+            formatted_text += f"\n\n{NORMALIZED_STATE_NOTE}"
 
         if display_width and display_height:
             formatted_text += (
@@ -231,7 +245,8 @@ class IOSStateProvider(StateProvider):
             use_normalized=self.use_normalized,
             coordinate_scale_x=coordinate_scale_x,
             coordinate_scale_y=coordinate_scale_y,
-            coordinate_contract_active=bool(display_width and display_height),
+            coordinate_contract_active=bool(display_width and display_height)
+            or normalized_ready,
             model_screenshot_width=display_width,
             model_screenshot_height=display_height,
         )

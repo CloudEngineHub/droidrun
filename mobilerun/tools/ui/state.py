@@ -48,8 +48,9 @@ class UIState:
         # space (== convert_point basis). None means "no contract / native".
         self.model_screenshot_width = model_screenshot_width
         self.model_screenshot_height = model_screenshot_height
-        # Whether the vision coordinate contract (resized+grid screenshot,
-        # declared display space) is active for this snapshot. Action-time
+        # Whether a coordinate contract (resized+grid screenshot with declared
+        # display space, or normalized 0-1000 with a real screen size) is
+        # active for this snapshot. Action-time
         # coordinate guards read it from here so they match the space this
         # snapshot's convert_point uses.
         self.coordinate_contract_active = coordinate_contract_active

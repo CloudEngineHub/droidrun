@@ -151,10 +151,30 @@ def _require_active_coordinate_contract(ctx: "ActionContext") -> None:
     )
 
 
+def _validate_normalized_point(
+    x: int | float, y: int | float, *, ctx: "ActionContext"
+) -> None:
+    # Screenshot-only mode reports its own error.
+    if _uses_screenshot_only_coordinates(ctx):
+        return
+    if not getattr(ctx.ui, "use_normalized", False):
+        return
+    try:
+        inside = 0 <= float(x) <= NORMALIZED_MAX and 0 <= float(y) <= NORMALIZED_MAX
+    except (TypeError, ValueError):
+        inside = False
+    if not inside:
+        raise ValueError(
+            f"Coordinates ({x}, {y}) are outside the normalized 0-1000 range "
+            "of the device state. Use the element bounds shown to you and retry."
+        )
+
+
 def _convert_action_point(
     x: int | float, y: int | float, *, ctx: "ActionContext"
 ) -> tuple[int, int]:
     _validate_screenshot_only_point(x, y, ctx=ctx)
+    _validate_normalized_point(x, y, ctx=ctx)
     _require_active_coordinate_contract(ctx)
     _validate_model_space_point(x, y, ctx=ctx)
     abs_x, abs_y = ctx.ui.convert_point(x, y)
