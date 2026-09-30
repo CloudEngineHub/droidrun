@@ -37,9 +37,11 @@ def _is_anthropic(model_id: str) -> bool:
 def model_uses_normalized_coordinates(model_id: str) -> bool:
     """Whether the model answers screenshot positions on a 0-1000 grid.
 
-    Gemma grounds in normalized coordinates and ignores a declared pixel space.
+    Gemma and Gemini 3.8 Flash ground in normalized coordinates and ignore a
+    declared pixel space.
     """
-    return "gemma" in model_id.lower()
+    model = model_id.lower()
+    return "gemma" in model or "gemini-3.8-flash" in model
 
 
 def model_effective_dims(model_id: str, width: int, height: int) -> tuple[int, int]:
