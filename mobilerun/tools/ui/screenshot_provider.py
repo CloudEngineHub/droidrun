@@ -15,12 +15,10 @@ if TYPE_CHECKING:
 _SCREENSHOT_ONLY_GUIDANCE = (
     "Prefer click_at on the center of visible text or controls, especially in "
     "dense lists, adjacent rows, and compact menus. Use click_area only for "
-    "large, unambiguous targets. If a target row is partially visible or close "
-    "to the top or bottom edge, scroll it toward the middle of the screen "
-    "before tapping. If a tap does not change the screen, do not repeat the "
-    "same coordinate; choose a better point on the intended target or use "
-    "navigation. For text entry, focus a field with a coordinate action first, "
-    "then use direct text typing."
+    "large, unambiguous targets. If a tap does not change the screen, do not "
+    "repeat the same coordinate; choose a better point on the intended target "
+    "or use navigation. For text entry, focus a field with a coordinate action "
+    "first, then use direct text typing."
 )
 
 
