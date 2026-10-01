@@ -213,7 +213,7 @@ class IOSStateProvider(StateProvider):
                 )
 
         formatted_text = _format_elements(
-            elements, screen_width, screen_height, normalized=self.use_normalized
+            elements, screen_width, screen_height, normalized=normalized_ready
         )
         if normalized_ready and self.vision_enabled:
             formatted_text += f"\n\n{NORMALIZED_STATE_NOTE}"

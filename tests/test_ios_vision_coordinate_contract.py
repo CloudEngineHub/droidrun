@@ -469,5 +469,6 @@ def test_normalized_mode_without_screen_bounds_skips_the_0_1000_text():
     state = _state(provider)
 
     assert "displayBounds" not in _general_element(state)
+    assert "(normalized [0-1000])" not in state.formatted_text
     assert "normalized 0-1000 on both axes" not in state.formatted_text
     assert state.coordinate_contract_active is False

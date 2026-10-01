@@ -399,6 +399,7 @@ def test_normalized_a11y_click_at_rejects_points_outside_0_1000() -> None:
 
 def test_normalized_a11y_refuses_coordinates_without_a_screen_size() -> None:
     ctx = _a11y_context(vision=True, screen=(0, 0))
+    assert "(normalized [0-1000])" not in ctx.ui.formatted_text
 
     tap = asyncio.run(click_at(500, 500, ctx=ctx))
     drag = asyncio.run(swipe([500, 800], [500, 200], ctx=ctx))
@@ -452,3 +453,21 @@ def test_gemma_executor_with_its_own_vision_uses_normalized_coordinates(
     )
 
     assert agent.state_provider.use_normalized is True
+
+
+@pytest.mark.parametrize("area", [(-100, 400, 1100, 600), (200, 900, 400, 1100)])
+def test_normalized_a11y_click_area_rejects_corners_outside_0_1000(area) -> None:
+    ctx = _a11y_context(vision=True)
+
+    result = asyncio.run(click_area(*area, ctx=ctx))
+
+    assert result.success is False
+    assert "outside the normalized 0-1000 range" in result.summary
+    ctx.driver.tap.assert_not_awaited()
+
+
+def test_normalized_a11y_click_area_taps_the_center() -> None:
+    ctx = _a11y_context(vision=True)
+
+    assert asyncio.run(click_area(100, 100, 300, 300, ctx=ctx)).success
+    ctx.driver.tap.assert_awaited_once_with(216, 480)

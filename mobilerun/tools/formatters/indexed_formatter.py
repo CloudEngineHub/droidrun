@@ -87,7 +87,9 @@ class IndexedFormatter(TreeFormatter):
 
     def _format_ui_elements_text(self, a11y_tree: List[Dict[str, Any]]) -> str:
         """Format UI elements text."""
-        coord_note = " (normalized [0-1000])" if self.use_normalized else ""
+        # Label only bounds that were actually normalized.
+        normalized = self.use_normalized and self.screen_width and self.screen_height
+        coord_note = " (normalized [0-1000])" if normalized else ""
         schema = (
             "'index. className: resourceId; checkedState, text - bounds(x1,y1,x2,y2)'"
         )

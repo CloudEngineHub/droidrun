@@ -372,6 +372,8 @@ async def click_area(
         pre_ui = await _macro_pre_ui(ctx)
         _validate_screenshot_only_point(x1, y1, ctx=ctx)
         _validate_screenshot_only_point(x2, y2, ctx=ctx)
+        _validate_normalized_point(x1, y1, ctx=ctx)
+        _validate_normalized_point(x2, y2, ctx=ctx)
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
         abs_x, abs_y = _convert_action_point(cx, cy, ctx=ctx)
         await ctx.driver.tap(abs_x, abs_y)
