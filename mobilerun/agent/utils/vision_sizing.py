@@ -25,6 +25,10 @@ from mobilerun.tools.helpers.images import (
 _ANTHROPIC_STANDARD = (1568, 1568)  # (max_edge, max_tokens)
 _ANTHROPIC_HIGHRES = (2576, 4784)
 
+# Models that ground poorly past this long edge, even though the provider
+# accepts a larger image.
+_GROUNDING_MAX_SIDE = {"claude-sonnet-5": 1568}
+
 
 def _model_id(llm: Any) -> str:
     return str(getattr(llm, "model", "") or "")
@@ -55,9 +59,12 @@ def model_effective_dims(model_id: str, width: int, height: int) -> tuple[int, i
             if model_id in ANTHROPIC_HIGHRES_MODELS
             else _ANTHROPIC_STANDARD
         )
-        return anthropic_resized_size(base_w, base_h, edge, tokens)
+        base_w, base_h = anthropic_resized_size(base_w, base_h, edge, tokens)
     # OpenAI / Gemini / Ollama / OpenAI-compatible: ground at the declared size
     # (empirically no further server-side downsize for the supported models).
+    limit = _GROUNDING_MAX_SIDE.get(model_id)
+    if limit and max(base_w, base_h) > limit:
+        base_w, base_h = fit_dimensions_to_max_side(base_w, base_h, limit)
     return base_w, base_h
 
 
