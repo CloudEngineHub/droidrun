@@ -419,7 +419,12 @@ def test_oauth_structured_extraction_prompts_for_schema(
 
 @pytest.mark.parametrize(
     ("model", "effort"),
-    (("gpt-6-sol", "none"), ("gpt-6-luna", "xhigh"), ("gpt-5.6-sol", "high")),
+    (
+        ("gpt-6.1-sol", "max"),
+        ("gpt-6-sol", "none"),
+        ("gpt-6-luna", "xhigh"),
+        ("gpt-5.6-sol", "high"),
+    ),
 )
 def test_oauth_forwards_configured_reasoning_for_every_model(
     tmp_path, monkeypatch, model: str, effort: str
@@ -450,7 +455,7 @@ def test_oauth_forwards_configured_reasoning_for_every_model(
     assert request["reasoning"] == {"effort": effort}
 
 
-@pytest.mark.parametrize("model", ("gpt-6-sol", "gpt-6-luna"))
+@pytest.mark.parametrize("model", ("gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"))
 def test_oauth_gpt_6_sol_and_luna_have_no_reasoning_default(tmp_path, model) -> None:
     llm = _offline_oauth_llm(tmp_path, model=model)
 
@@ -458,7 +463,15 @@ def test_oauth_gpt_6_sol_and_luna_have_no_reasoning_default(tmp_path, model) -> 
 
 
 @pytest.mark.parametrize(
-    "model", ("gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna")
+    "model",
+    (
+        "gpt-6.1-sol",
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+    ),
 )
 def test_oauth_models_reject_minimal_effort_locally(tmp_path, model) -> None:
     llm = OpenAIOAuth(
@@ -473,10 +486,10 @@ def test_oauth_models_reject_minimal_effort_locally(tmp_path, model) -> None:
         llm._sanitize_reasoning_kwargs({})
 
 
-def test_oauth_saved_gpt_5_5_profile_still_loads(tmp_path) -> None:
-    llm = _offline_oauth_llm(tmp_path, model="openai-codex/gpt-5.5")
+def test_oauth_saved_gpt_6_sol_profile_still_loads(tmp_path) -> None:
+    llm = _offline_oauth_llm(tmp_path, model="openai-codex/gpt-6-sol")
 
-    assert llm.model == "gpt-5.5"
+    assert llm.model == "gpt-6-sol"
 
 
 def _stream_events(*deltas: str, usage: object | None = None) -> list:
@@ -707,3 +720,10 @@ def test_achat_closes_the_async_stream(tmp_path, monkeypatch) -> None:
     asyncio.run(llm._achat([ChatMessage(role=MessageRole.USER, content="Reply OK")]))
 
     assert events.closed is True
+
+
+def test_oauth_gpt_6_1_sol_rejects_none_effort_locally(tmp_path) -> None:
+    llm = _offline_oauth_llm(tmp_path, model="gpt-6.1-sol")
+
+    with pytest.raises(ValueError, match="does not support reasoning effort 'none'"):
+        llm._sanitize_reasoning_kwargs({"reasoning": {"effort": "none"}})

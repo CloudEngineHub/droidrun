@@ -5,7 +5,7 @@ Usage:
 
     llm = OpenAIOAuth(
         auth_model="openai-codex/gpt-6-astra",
-        custom_model="gpt-6-sol",  # optional override
+        custom_model="gpt-6.1-sol",  # optional override
         oauth_refresh_token="rt_...",
         oauth_access_token="eyJ...",  # optional if cached file already exists
         oauth_credential_path=str(OPENAI_OAUTH_CREDENTIAL_PATH),

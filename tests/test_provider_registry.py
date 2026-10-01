@@ -96,6 +96,7 @@ def test_anthropic_catalogs_list_the_current_lineup() -> None:
     assert api_key_variant.default_model == "claude-sonnet-5"
     assert api_key_models == (
         "claude-sonnet-5",
+        "claude-sonnet-5-5",
         "claude-opus-5-5",
         "claude-fable-5-1",
     )
@@ -110,13 +111,13 @@ def test_openai_oauth_catalog_hides_unsupported_codex_model() -> None:
     assert variant.default_model == "gpt-6-astra"
     assert models == (
         "gpt-6-astra",
-        "gpt-6-sol",
+        "gpt-6.1-sol",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
         "gpt-5.6-luna",
     )
     assert "gpt-5.3-codex" not in models
-    assert "gpt-5.5" not in models
+    assert "gpt-6-sol" not in models
 
 
 def test_openai_api_key_catalog_uses_current_default_model() -> None:
@@ -126,7 +127,7 @@ def test_openai_api_key_catalog_uses_current_default_model() -> None:
     assert variant.default_model == "gpt-6-astra"
     assert models == (
         "gpt-6-astra",
-        "gpt-6-sol",
+        "gpt-6.1-sol",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
         "gpt-5.6-luna",
@@ -156,10 +157,13 @@ def test_default_profiles_use_gemini_3_8_flash() -> None:
         ("oauth", "gpt-5.6-luna", "gpt-5.6-luna"),
         ("api_key", "gpt-6-astra", "gpt-6-astra"),
         ("oauth", "gpt-6-astra", "gpt-6-astra"),
+        ("api_key", "openai/gpt-6.1-sol", "gpt-6.1-sol"),
+        ("oauth", "openai-codex/gpt-6.1-sol", "gpt-6.1-sol"),
         ("api_key", "openai/gpt-6-sol", "gpt-6-sol"),
+        ("oauth", "openai-codex/gpt-6-sol", "gpt-6-sol"),
         ("oauth", "openai-codex/gpt-6-luna", "gpt-6-luna"),
-        ("api_key", "openai/gpt-5.5", "gpt-5.5"),
-        ("oauth", "openai-codex/gpt-5.5", "gpt-5.5"),
+        ("api_key", "openai/gpt-5.5", "openai/gpt-5.5"),
+        ("oauth", "openai-codex/gpt-5.5", "openai-codex/gpt-5.5"),
         ("api_key", "openai/gpt-5.4-mini", "gpt-5.4-mini"),
     ],
 )
