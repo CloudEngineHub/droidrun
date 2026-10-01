@@ -551,7 +551,8 @@ async def open_bundle_id(
     ctx: "ActionContext",
 ) -> ActionResult:
     """Open an app by exact package name, app id, or iOS bundle identifier."""
-    identifier = app_id or bundle_id
+    # Models sometimes end parameter values with a newline.
+    identifier = str(app_id or bundle_id or "").strip()
     if not identifier:
         return ActionResult(
             success=False,
