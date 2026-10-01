@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from llama_index.core.types import PydanticProgramMode
 
+from mobilerun.agent.providers.registry import OPENAI_GPT6_MODELS
 from mobilerun.agent.utils.llm_picker import (
     load_llm,
     load_llms_from_profiles,
@@ -133,7 +134,7 @@ def test_openai_structured_predict_omits_per_call_sampling_params(
     assert async_result.value == "OK"
     for payload in (sync_payload, async_payload):
         assert {"temperature", "top_p"}.isdisjoint(payload)
-        if model.startswith("gpt-6-"):
+        if model in OPENAI_GPT6_MODELS:
             assert {"top_logprobs", "logprobs"}.isdisjoint(payload)
         if model == "gpt-6-astra":
             assert payload["reasoning"] == {"effort": "low"}
@@ -355,10 +356,12 @@ def test_openai_astra_structured_requests_retain_configured_options() -> None:
         assert payload["extra_body"] == {"include": ["reasoning.encrypted_content"]}
 
 
-def test_openai_alias_loads_openai_responses_without_temperature_for_gpt_5_5() -> None:
+def test_openai_alias_loads_openai_responses_without_temperature_for_gpt_6_1_sol() -> (
+    None
+):
     llm = load_llm(
         "OpenAI",
-        model="gpt-5.5",
+        model="gpt-6.1-sol",
         api_key="stub",
         temperature=0.4,
     )
@@ -374,14 +377,14 @@ def test_openai_responses_profile_loads_with_current_default_metadata() -> None:
         {
             "manager": LLMProfile(
                 provider="OpenAIResponses",
-                model="gpt-5.5",
+                model="gpt-6-astra",
                 kwargs={"api_key": "stub"},
             )
         }
     )["manager"]
 
     assert type(llm).__name__ == "MobilerunOpenAIResponses"
-    assert llm.metadata.model_name == "gpt-5.5"
+    assert llm.metadata.model_name == "gpt-6-astra"
     assert llm.metadata.context_window == 1_050_000
 
 

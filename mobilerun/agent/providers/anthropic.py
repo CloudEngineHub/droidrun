@@ -72,6 +72,7 @@ ANTHROPIC_HIGHRES_MODELS = frozenset(
         "claude-opus-4-8",
         "claude-opus-5",
         ANTHROPIC_OPUS_5_5_MODEL,
+        ANTHROPIC_SONNET_5_5_MODEL,
         "claude-sonnet-5",
         ANTHROPIC_FABLE_5_1_MODEL,
         "claude-fable-5",

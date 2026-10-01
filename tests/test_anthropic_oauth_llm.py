@@ -130,7 +130,9 @@ def test_models_without_sampling_strip_all_final_payload_overrides(model):
     assert {"temperature", "top_p", "top_k"}.isdisjoint(session.payload)
 
 
-@pytest.mark.parametrize("model", ["claude-fable-5-1", "claude-opus-5-5"])
+@pytest.mark.parametrize(
+    "model", ["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5"]
+)
 def test_current_models_use_high_resolution_vision_budget(model):
     assert model in ANTHROPIC_HIGHRES_MODELS
 
