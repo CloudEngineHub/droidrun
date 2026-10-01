@@ -124,7 +124,7 @@ async def main():
     await driver.connect()
 
     # Initialize LLM
-    llm = load_llm("OpenAIResponses", model="gpt-6-sol")
+    llm = load_llm("OpenAIResponses", model="gpt-6.1-sol")
 
     # Create workflow instance
     workflow = AppStarter(driver=driver, llm=llm, timeout=60, verbose=True)

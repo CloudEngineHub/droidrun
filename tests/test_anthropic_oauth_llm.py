@@ -76,6 +76,7 @@ def test_opus_4_8_payload_sends_max_tokens_without_temperature():
     ("model", "context_window"),
     [
         ("claude-opus-5-5", 1_000_000),
+        ("claude-sonnet-5-5", 1_000_000),
         ("claude-opus-5", 1_000_000),
         ("claude-sonnet-5", 1_000_000),
         ("claude-fable-5-1", 1_000_000),
@@ -98,6 +99,7 @@ def test_current_model_metadata_has_verified_context_window(model, context_windo
     "model",
     [
         "claude-opus-5-5",
+        "claude-sonnet-5-5",
         "claude-opus-5",
         "claude-sonnet-5",
         "claude-fable-5-1",
@@ -145,7 +147,13 @@ def test_fable_5_1_uses_current_claude_code_identity_defaults():
 
 @pytest.mark.parametrize(
     "model",
-    ["claude-fable-5-1", "claude-opus-5-5", "claude-opus-4-7", "claude-haiku-4-5"],
+    [
+        "claude-fable-5-1",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-opus-4-7",
+        "claude-haiku-4-5",
+    ],
 )
 def test_oauth_structured_predict_uses_text_pydantic_extraction(monkeypatch, model):
     from llama_index.core.base.llms.types import ChatResponse
