@@ -1336,7 +1336,7 @@ def test_openai_like_non_minimax_endpoint_is_unchanged() -> None:
     assert llm.metadata.is_function_calling_model is False
 
 
-@pytest.mark.parametrize("model", [None, "deepseek-flash", "deepseek-chat"])
+@pytest.mark.parametrize("model", [None, "deepseek-flash", "deepseek-v4-pro"])
 def test_deepseek_uses_current_model_metadata(model: str | None) -> None:
     kwargs = {"model": model} if model else {}
     llm = load_llm("DeepSeek", api_key="stub", **kwargs)
@@ -1345,6 +1345,13 @@ def test_deepseek_uses_current_model_metadata(model: str | None) -> None:
     assert llm.metadata.is_function_calling_model is True
     assert llm.metadata.context_window == 1_048_576
     assert llm.pydantic_program_mode is PydanticProgramMode.LLM
+
+
+@pytest.mark.parametrize("model", ["deepseek-chat", "deepseek-reasoner"])
+def test_deepseek_retired_aliases_are_not_function_calling_models(model: str) -> None:
+    llm = load_llm("DeepSeek", api_key="stub", model=model)
+
+    assert llm.metadata.is_function_calling_model is False
 
 
 @pytest.mark.parametrize("base_url", [None, "https://minimax-proxy.example/v1"])
