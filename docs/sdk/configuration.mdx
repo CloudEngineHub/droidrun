@@ -63,7 +63,7 @@ AgentConfig(
     vision_only=False,               # Use screenshots without an accessibility tree
     after_sleep_action=1.0,          # Wait after actions (seconds)
     wait_for_stable_ui=0.3,          # Wait for UI to stabilize (seconds)
-    use_normalized_coordinates=False, # Use normalized coordinates instead of absolute pixels
+    use_normalized_coordinates=False, # Use normalized 0-1000 coordinates instead of absolute pixels (automatic for Gemma and Gemini 3.8 Flash with vision)
 
     # Sub-configs
     fast_agent=FastAgentConfig(...),
@@ -255,7 +255,7 @@ agent = MobileAgent(
         "manager": load_llm("OpenAIResponses", model="gpt-6-astra"),  # Planning
         "executor": load_llm("GoogleGenAI", model="gemini-3.8-flash"),  # Action selection
         "fast_agent": load_llm("GoogleGenAI", model="gemini-3.8-flash"),   # Fast Agent: Direct execution (XML tool-calling)
-        "app_opener": load_llm("OpenAIResponses", model="gpt-6-sol"),  # App launching
+        "app_opener": load_llm("OpenAIResponses", model="gpt-6.1-sol"),  # App launching
         "structured_output": load_llm("GoogleGenAI", model="gemini-3.8-flash"),  # Output extraction
     }
 )
@@ -441,7 +441,7 @@ agent = MobileAgent(
         "manager": load_llm("OpenAIResponses", model="gpt-6-astra"),  # Planning
         "executor": load_llm("GoogleGenAI", model="gemini-3.8-flash"),  # Action selection
         "fast_agent": load_llm("GoogleGenAI", model="gemini-3.8-flash"),   # Fast Agent: Direct execution (XML tool-calling)
-        "app_opener": load_llm("OpenAIResponses", model="gpt-6-sol"),  # App launching
+        "app_opener": load_llm("OpenAIResponses", model="gpt-6.1-sol"),  # App launching
         "structured_output": load_llm("GoogleGenAI", model="gemini-3.8-flash"),  # Output extraction
     },
 
@@ -536,7 +536,7 @@ llm_profiles:
 
   app_opener:
     provider: OpenAI
-    model: gpt-6-sol
+    model: gpt-6.1-sol
     temperature: 0.0
 
   structured_output:

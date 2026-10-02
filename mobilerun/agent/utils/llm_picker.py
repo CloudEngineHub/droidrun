@@ -97,9 +97,9 @@ GEMINI_OAUTH_UNSUPPORTED_MODELS = {
 }
 OPENAI_RESPONSES_MODELS_WITHOUT_SAMPLING_PARAMS = {
     "gpt-6-astra",
+    "gpt-6.1-sol",
     "gpt-6-sol",
     "gpt-6-luna",
-    "gpt-5.5",
     "gpt-5.6-sol",
     "gpt-5.6-terra",
     "gpt-5.6-luna",
@@ -113,13 +113,7 @@ OPENAI_GPT6_UNSUPPORTED_PARAMS = {"logprobs", "top_logprobs"}
 OPENAI_GPT6_UNSUPPORTED_INCLUDE = "message.output_text.logprobs"
 DEEPSEEK_DEFAULT_MODEL = "deepseek-flash"
 DEEPSEEK_CONTEXT_WINDOW = 1_048_576
-# deepseek-chat and deepseek-reasoner are server aliases for deepseek-flash.
-DEEPSEEK_FUNCTION_CALLING_MODELS = {
-    "deepseek-flash",
-    "deepseek-v4-pro",
-    "deepseek-chat",
-    "deepseek-reasoner",
-}
+DEEPSEEK_FUNCTION_CALLING_MODELS = {"deepseek-flash", "deepseek-v4-pro"}
 
 
 def normalize_provider_name(provider_name: str) -> str:

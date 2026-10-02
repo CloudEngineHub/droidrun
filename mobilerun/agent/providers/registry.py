@@ -53,16 +53,18 @@ OPENAI_OAUTH_UNSUPPORTED_MODELS = frozenset(
 )
 # No longer offered, but still recognized when normalizing saved model ids.
 OPENAI_LEGACY_MODELS = frozenset(
-    {"gpt-6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"}
+    {"gpt-6-sol", "gpt-6-luna", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"}
 )
 # GPT-6 ids are missing from llama-index's static OpenAI metadata.
-OPENAI_GPT6_MODELS = frozenset({"gpt-6-astra", "gpt-6-sol", "gpt-6-luna"})
-OPENAI_GPT6_CONTEXT_WINDOW = 1_050_000
-_OPENAI_NONE_TO_MAX_EFFORTS = frozenset(
-    {"none", "low", "medium", "high", "xhigh", "max"}
+OPENAI_GPT6_MODELS = frozenset(
+    {"gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna"}
 )
+OPENAI_GPT6_CONTEXT_WINDOW = 1_050_000
+_OPENAI_LOW_TO_MAX_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
+_OPENAI_NONE_TO_MAX_EFFORTS = _OPENAI_LOW_TO_MAX_EFFORTS | {"none"}
 OPENAI_REASONING_EFFORTS: dict[str, frozenset[str]] = {
-    "gpt-6-astra": frozenset({"low", "medium", "high", "xhigh", "max"}),
+    "gpt-6-astra": _OPENAI_LOW_TO_MAX_EFFORTS,
+    "gpt-6.1-sol": _OPENAI_LOW_TO_MAX_EFFORTS,
     "gpt-6-sol": _OPENAI_NONE_TO_MAX_EFFORTS,
     "gpt-6-luna": _OPENAI_NONE_TO_MAX_EFFORTS,
     "gpt-5.6-sol": _OPENAI_NONE_TO_MAX_EFFORTS,
@@ -143,7 +145,7 @@ PROVIDER_FAMILIES: tuple[ProviderFamilySpec, ...] = (
                 default_model=OPENAI_API_DEFAULT_MODEL,
                 models=(
                     OPENAI_API_DEFAULT_MODEL,
-                    "gpt-6-sol",
+                    "gpt-6.1-sol",
                     "gpt-5.6-sol",
                     "gpt-5.6-terra",
                     "gpt-5.6-luna",
@@ -157,7 +159,7 @@ PROVIDER_FAMILIES: tuple[ProviderFamilySpec, ...] = (
                 default_model=OPENAI_OAUTH_DEFAULT_MODEL,
                 models=(
                     OPENAI_OAUTH_DEFAULT_MODEL,
-                    "gpt-6-sol",
+                    "gpt-6.1-sol",
                     "gpt-5.6-sol",
                     "gpt-5.6-terra",
                     "gpt-5.6-luna",
