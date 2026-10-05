@@ -55,7 +55,10 @@ def test_sdk_debug_config_logs_app_card_loading(
         TelemetryConfig,
     )
 
-    (tmp_path / "app_cards.json").write_text(json.dumps({"com.example": "a.md"}))
+    (tmp_path / "android").mkdir()
+    (tmp_path / "android" / "app_cards.json").write_text(
+        json.dumps({"com.example": "a.md"})
+    )
     mobilerun_logger.setLevel(logging.INFO)
     records = _Records()
     mobilerun_logger.addHandler(records)
@@ -73,7 +76,7 @@ def test_sdk_debug_config_logs_app_card_loading(
         llms=MockLLM(),
     )
 
-    assert "Loaded app_cards.json with 1 entries" in records.messages
+    assert "Loaded android/app_cards.json with 1 entries" in records.messages
 
 
 def test_portal_setup_gets_mobilerun_version_when_supported():

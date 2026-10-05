@@ -1,11 +1,13 @@
 """
 Local file-based app card provider.
 
-Loads app cards from local filesystem using app_cards.json mapping.
+Loads app cards from one folder per platform, each with its own
+app_cards.json mapping.
 """
 
 import json
 import logging
+from pathlib import Path
 from typing import Dict
 
 from mobilerun.app_cards.app_card_provider import AppCardProvider
@@ -13,33 +15,59 @@ from mobilerun.config_manager.path_resolver import PathResolver
 
 logger = logging.getLogger("mobilerun")
 
+PLATFORMS = ("android", "ios")
+_MAPPING_FILE = "app_cards.json"
+
+
+def _resolve_cards_folder(app_cards_dir: str) -> Path:
+    """Use the working-dir folder if it has app cards, else the package one."""
+    path = Path(app_cards_dir).expanduser()
+    if path.is_absolute():
+        return path
+    candidates = (Path.cwd() / path, PathResolver.get_project_root() / path)
+    names = [f"{platform}/{_MAPPING_FILE}" for platform in PLATFORMS] + [_MAPPING_FILE]
+    for folder in candidates:
+        if any((folder / name).exists() for name in names):
+            return folder
+    return candidates[0]
+
 
 class LocalAppCardProvider(AppCardProvider):
-    """Load app cards from local filesystem with in-memory caching."""
+    """Load app cards from local filesystem with in-memory caching.
+
+    Layout: <app_cards_dir>/android/app_cards.json and
+    <app_cards_dir>/ios/app_cards.json, each mapping an app id to a card
+    file in the same folder. A platform without its own folder uses
+    <app_cards_dir>/app_cards.json, the earlier single-folder layout.
+    """
 
     def __init__(self, app_cards_dir: str = "config/app_cards"):
         """
         Initialize local provider.
 
         Args:
-            app_cards_dir: Directory containing app_cards.json and markdown files
+            app_cards_dir: Directory containing the android/ and ios/ card folders
         """
-        # Resolve app_cards.json path once
-        mapping_path = PathResolver.resolve(f"{app_cards_dir}/app_cards.json")
-        self.app_cards_dir = mapping_path.parent
+        self.app_cards_dir = _resolve_cards_folder(app_cards_dir)
 
-        # Load mapping immediately
-        try:
-            if mapping_path.exists():
+        # platform (None = shared app_cards.json) -> (cards folder, mapping)
+        self._mappings: Dict[str | None, tuple[Path, Dict[str, str]]] = {}
+        for platform in (*PLATFORMS, None):
+            relative = f"{platform}/{_MAPPING_FILE}" if platform else _MAPPING_FILE
+            mapping_path = self.app_cards_dir / relative
+            if not mapping_path.exists():
+                continue
+            try:
                 with open(mapping_path, "r", encoding="utf-8") as f:
-                    self.mapping = json.load(f)
-                logger.debug(f"Loaded app_cards.json with {len(self.mapping)} entries")
-            else:
-                logger.warning(f"app_cards.json not found at {mapping_path}")
-                self.mapping = {}
-        except Exception as e:
-            logger.warning(f"Failed to load app_cards.json: {e}")
-            self.mapping = {}
+                    mapping = json.load(f)
+            except Exception as e:
+                logger.warning(f"Failed to load {mapping_path}: {e}")
+                continue
+            self._mappings[platform] = (mapping_path.parent, mapping)
+            logger.debug(f"Loaded {relative} with {len(mapping)} entries")
+
+        if not self._mappings:
+            logger.warning(f"No app_cards.json found in {self.app_cards_dir}")
 
         # Content cache: (package_name, instruction, platform) -> content
         self._content_cache: Dict[tuple[str, str, str | None], str] = {}
@@ -49,10 +77,6 @@ class LocalAppCardProvider(AppCardProvider):
     ) -> str:
         """
         Load app card for a package name from local files.
-
-        A mapping value is either a card path for every platform, or a dict of
-        per-platform paths with an optional "default", e.g.
-        {"android": "android/tiktok.md", "ios": "ios/tiktok.md"}.
 
         Args:
             package_name: Android package name or iOS bundle id
@@ -71,24 +95,19 @@ class LocalAppCardProvider(AppCardProvider):
             logger.debug(f"App card cache hit: {package_name}")
             return self._content_cache[cache_key]
 
-        # Check if package exists in mapping
-        if package_name not in self.mapping:
+        source = self._mappings.get(platform) or self._mappings.get(None)
+        if source is None or package_name not in source[1]:
             self._content_cache[cache_key] = ""
             return ""
 
-        # Get app card file path (relative to app_cards_dir)
-        filename = self.mapping[package_name]
-        if isinstance(filename, dict):
-            filename = filename.get(platform or "") or filename.get("default")
-        if not filename:
-            self._content_cache[cache_key] = ""
-            logger.debug(f"No app card for {package_name} on {platform}")
-            return ""
+        # Get app card file path (relative to the platform folder)
+        cards_folder, mapping = source
+        filename = mapping[package_name]
         if not isinstance(filename, str):
             self._content_cache[cache_key] = ""
             logger.warning(f"Invalid app card path for {package_name}: {filename!r}")
             return ""
-        app_card_path = self.app_cards_dir / filename
+        app_card_path = cards_folder / filename
 
         # Read file
         try:
@@ -127,5 +146,5 @@ class LocalAppCardProvider(AppCardProvider):
         """
         return {
             "content_entries": len(self._content_cache),
-            "mapping_entries": len(self.mapping),
+            "mapping_entries": sum(len(m) for _, m in self._mappings.values()),
         }

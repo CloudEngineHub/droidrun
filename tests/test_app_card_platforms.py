@@ -9,25 +9,24 @@ from mobilerun.app_cards.providers.local_provider import LocalAppCardProvider
 from mobilerun.app_cards.providers.server_provider import ServerAppCardProvider
 
 
+def _write_cards(folder, mapping, cards):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "app_cards.json").write_text(json.dumps(mapping))
+    for name, text in cards.items():
+        (folder / name).write_text(text)
+
+
 @pytest.fixture
 def cards_dir(tmp_path):
-    (tmp_path / "android").mkdir()
-    (tmp_path / "ios").mkdir()
-    (tmp_path / "android" / "tiktok.md").write_text("ANDROID TIKTOK")
-    (tmp_path / "ios" / "tiktok.md").write_text("IOS TIKTOK")
-    (tmp_path / "shared.md").write_text("SHARED")
-    (tmp_path / "app_cards.json").write_text(
-        json.dumps(
-            {
-                "com.zhiliaoapp.musically": {
-                    "android": "android/tiktok.md",
-                    "ios": "ios/tiktok.md",
-                },
-                "com.example.notes": {"ios": "ios/tiktok.md", "default": "shared.md"},
-                "com.example.both": "shared.md",
-                "com.example.broken": ["shared.md"],
-            }
-        )
+    _write_cards(
+        tmp_path / "android",
+        {"com.zhiliaoapp.musically": "tiktok.md", "com.example.broken": ["x.md"]},
+        {"tiktok.md": "ANDROID TIKTOK"},
+    )
+    _write_cards(
+        tmp_path / "ios",
+        {"com.zhiliaoapp.musically": "tiktok.md"},
+        {"tiktok.md": "IOS TIKTOK"},
     )
     return tmp_path
 
@@ -36,7 +35,7 @@ def _load(provider, package, platform):
     return asyncio.run(provider.load_app_card(package, "goal", platform))
 
 
-def test_local_provider_picks_the_card_for_each_platform(cards_dir) -> None:
+def test_local_provider_reads_the_folder_for_each_platform(cards_dir) -> None:
     provider = LocalAppCardProvider(str(cards_dir))
 
     assert _load(provider, "com.zhiliaoapp.musically", "android") == "ANDROID TIKTOK"
@@ -44,19 +43,42 @@ def test_local_provider_picks_the_card_for_each_platform(cards_dir) -> None:
     assert _load(provider, "com.zhiliaoapp.musically", None) == ""
 
 
-def test_local_provider_falls_back_to_default_and_plain_paths(cards_dir) -> None:
-    provider = LocalAppCardProvider(str(cards_dir))
+def test_single_app_cards_json_is_used_for_a_platform_without_a_folder(
+    tmp_path,
+) -> None:
+    _write_cards(tmp_path, {"com.example.notes": "notes.md"}, {"notes.md": "SHARED"})
+    _write_cards(
+        tmp_path / "ios", {"com.example.notes": "notes.md"}, {"notes.md": "IOS"}
+    )
+    provider = LocalAppCardProvider(str(tmp_path))
 
     assert _load(provider, "com.example.notes", "android") == "SHARED"
-    assert _load(provider, "com.example.notes", "ios") == "IOS TIKTOK"
-    assert _load(provider, "com.example.both", "ios") == "SHARED"
-    assert _load(provider, "com.example.both", "android") == "SHARED"
+    assert _load(provider, "com.example.notes", "ios") == "IOS"
+    assert _load(provider, "com.example.notes", None) == "SHARED"
 
 
 def test_local_provider_ignores_an_invalid_mapping_value(cards_dir) -> None:
     provider = LocalAppCardProvider(str(cards_dir))
 
     assert _load(provider, "com.example.broken", "android") == ""
+
+
+def test_relative_folder_comes_entirely_from_the_working_dir(
+    tmp_path, monkeypatch
+) -> None:
+    from mobilerun.config_manager.path_resolver import PathResolver
+
+    work, package = tmp_path / "work", tmp_path / "package"
+    _write_cards(
+        work / "cards" / "android", {"com.app": "a.md"}, {"a.md": "USER ANDROID"}
+    )
+    _write_cards(package / "cards" / "ios", {"com.app": "a.md"}, {"a.md": "BUNDLED"})
+    monkeypatch.chdir(work)
+    monkeypatch.setattr(PathResolver, "get_project_root", staticmethod(lambda: package))
+    provider = LocalAppCardProvider("cards")
+
+    assert _load(provider, "com.app", "android") == "USER ANDROID"
+    assert _load(provider, "com.app", "ios") == ""
 
 
 def test_server_provider_sends_the_platform(monkeypatch) -> None:
