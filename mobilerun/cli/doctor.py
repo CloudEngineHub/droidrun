@@ -66,7 +66,18 @@ def _parse_version_tuple(version_str: str) -> tuple:
     cleaned = version_str.lstrip("v").strip()
     parts = []
     for p in cleaned.split("."):
-        # Leading digits only, so "26-dev" reads as 26.
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
+def _parse_portal_version(version_str: str) -> tuple:
+    """Like _parse_version_tuple, but '0.7.26-dev' reads as 0.7.26."""
+    cleaned = version_str.lstrip("v").strip()
+    parts = []
+    for p in cleaned.split("."):
         match = re.match(r"\d+", p)
         parts.append(int(match.group()) if match else 0)
     return tuple(parts)
@@ -308,18 +319,18 @@ async def check_portal_version(
         __version__, debug
     )
 
-    installed_t = _parse_version_tuple(installed)
+    installed_t = _parse_portal_version(installed)
 
     # Build message parts
     parts = [f"v{installed}"]
 
     if expected:
-        expected_t = _parse_version_tuple(expected)
+        expected_t = _parse_portal_version(expected)
         if installed_t != expected_t:
             parts.append(f"expected {expected}")
 
     if latest_portal:
-        latest_t = _parse_version_tuple(latest_portal)
+        latest_t = _parse_portal_version(latest_portal)
         if installed_t < latest_t:
             parts.append(f"latest: {latest_portal}")
 
@@ -329,7 +340,7 @@ async def check_portal_version(
 
     # Determine status
     if expected:
-        expected_t = _parse_version_tuple(expected)
+        expected_t = _parse_portal_version(expected)
         if installed_t < expected_t:
             return (
                 CheckResult("Portal Version", Status.WARN, msg),
@@ -363,7 +374,7 @@ async def check_portal_version(
         )
 
     if latest_portal:
-        latest_t = _parse_version_tuple(latest_portal)
+        latest_t = _parse_portal_version(latest_portal)
         if installed_t < latest_t:
             # Outdated but no specific compatible version required — warn
             return (

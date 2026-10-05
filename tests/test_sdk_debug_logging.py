@@ -154,3 +154,52 @@ def test_doctor_keeps_a_newer_portal_and_flags_an_older_one(
     result, _, _, _ = asyncio.run(doctor.check_portal_version(Device(), debug=False))
 
     assert result.status == doctor.Status[status]
+    if installed.startswith("0.7.26"):
+        assert "newer than 0.7.25" in result.message
+
+
+@pytest.mark.parametrize("in_place, uninstall", [(True, False), (False, True)])
+def test_setup_command_updates_in_place_only_when_asked(
+    monkeypatch, in_place, uninstall
+):
+    import asyncio
+
+    from mobilerun.cli import main
+
+    calls = []
+
+    async def fake_setup(device, debug=False, *, version=None, uninstall=True):
+        calls.append({"version": version, "uninstall": uninstall})
+        return True
+
+    async def fake_device(serial):
+        return object()
+
+    monkeypatch.setattr(main, "setup_portal", fake_setup)
+    monkeypatch.setattr(main.adb, "device", fake_device)
+
+    asyncio.run(
+        main._setup_portal(path=None, device="serial", debug=False, in_place=in_place)
+    )
+
+    assert calls[0]["version"] == mobilerun.__version__
+    assert calls[0]["uninstall"] is uninstall
+
+
+def test_sdk_version_check_still_flags_an_rc_after_its_release(monkeypatch):
+    import asyncio
+
+    from mobilerun.cli import doctor
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"tag_name": "v0.6.22"}
+
+    monkeypatch.setattr(doctor, "__version__", "0.6.22rc1")
+    monkeypatch.setattr(doctor.requests, "get", lambda url, **kwargs: Response())
+
+    result = asyncio.run(doctor.check_sdk_version(debug=False))
+
+    assert result.status == doctor.Status.WARN
