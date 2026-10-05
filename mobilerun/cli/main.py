@@ -43,6 +43,7 @@ from mobilerun.agent.utils.oauth.openai_oauth_llm import (
     DEFAULT_OPENAI_OAUTH_CALLBACK_PORT,
     DEFAULT_OPENAI_OAUTH_CREDENTIAL_PATH,
 )
+from mobilerun.agent.utils.portal_setup import portal_version_kwargs
 from mobilerun.cli.configure_wizard import (
     ConfigureWizardCallbacks,
     run_configure_wizard,
@@ -835,6 +836,7 @@ async def _setup_portal(
     debug: bool,
     latest: bool = False,
     specific_version: str | None = None,
+    in_place: bool = False,
 ):
     """Internal async function to install and enable the Mobilerun Portal on a device."""
     try:
@@ -868,7 +870,11 @@ async def _setup_portal(
             apk_context = download_portal_apk(debug)
         else:
             # Default: delegate to shared setup_portal()
-            success = await setup_portal(device_obj, debug)
+            success = await setup_portal(
+                device_obj,
+                debug,
+                **portal_version_kwargs(setup_portal, in_place=in_place),
+            )
             if success:
                 console.print(
                     "\n[bold green]Setup complete![/] The Mobilerun Portal is now installed and ready to use."
