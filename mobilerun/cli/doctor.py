@@ -66,10 +66,9 @@ def _parse_version_tuple(version_str: str) -> tuple:
     cleaned = version_str.lstrip("v").strip()
     parts = []
     for p in cleaned.split("."):
-        try:
-            parts.append(int(p))
-        except ValueError:
-            parts.append(0)
+        # Leading digits only, so "26-dev" reads as 26.
+        match = re.match(r"\d+", p)
+        parts.append(int(match.group()) if match else 0)
     return tuple(parts)
 
 
@@ -331,9 +330,22 @@ async def check_portal_version(
     # Determine status
     if expected:
         expected_t = _parse_version_tuple(expected)
-        if installed_t != expected_t:
+        if installed_t < expected_t:
             return (
                 CheckResult("Portal Version", Status.WARN, msg),
+                installed,
+                expected,
+                download_base,
+            )
+        if installed_t > expected_t:
+            # Auto-setup keeps a newer Portal too.
+            return (
+                CheckResult(
+                    "Portal Version",
+                    Status.PASS,
+                    f"v{installed} (newer than {expected}, "
+                    f"pinned for mobilerun {__version__})",
+                ),
                 installed,
                 expected,
                 download_base,
@@ -714,7 +726,7 @@ async def run_doctor(
         console.print("  [blue]→ Updating portal...[/]")
         from mobilerun.cli.main import _setup_portal
 
-        await _setup_portal(path=None, device=device.serial, debug=debug)
+        await _setup_portal(path=None, device=device.serial, debug=debug, in_place=True)
         # Wait for portal service to initialize after install
         console.print("  [dim]  waiting for portal to start...[/]")
         await asyncio.sleep(3)

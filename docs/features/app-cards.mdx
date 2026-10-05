@@ -116,6 +116,8 @@ config/app_cards/
     └── chrome.md
 ```
 
+An `app_cards.json` placed directly in `config/app_cards/` is not read; Mobilerun logs a warning and ignores it.
+
 ```bash
 mkdir -p config/app_cards/android
 touch config/app_cards/android/app_cards.json
