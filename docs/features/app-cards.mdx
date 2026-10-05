@@ -64,7 +64,7 @@ You can use this as a template to create cards for other apps (see "Creating Cus
 3. **Injection:** App card content is added to the agent's prompt
 4. **Guidance:** Agent uses the instructions to make better decisions
 
-**Technical note:** App cards are loaded asynchronously and cached in memory. Loading happens in the background and doesn't block agent execution.
+**Technical note:** App cards are cached in memory after the first load.
 
 ### When Are They Used?
 
@@ -115,6 +115,8 @@ config/app_cards/
     ├── app_cards.json
     └── chrome.md
 ```
+
+An `app_cards.json` placed directly in `config/app_cards/` is not read; Mobilerun logs a warning and ignores it.
 
 ```bash
 mkdir -p config/app_cards/android
@@ -181,7 +183,7 @@ mobilerun run "Open Chrome and search for mobilerun" --reasoning --debug
 
 Look for this log message:
 ```
-Loaded app card for com.android.chrome from config/app_cards/android/chrome.md
+Loaded app card for com.android.chrome from .../config/app_cards/android/chrome.md
 ```
 
 ---
@@ -196,6 +198,8 @@ agent:
     enabled: true
     app_cards_dir: config/app_cards
 ```
+
+A relative `app_cards_dir` is read from the working directory when it has `android/app_cards.json` or `ios/app_cards.json`, and otherwise from the cards bundled with Mobilerun. A working-directory folder replaces the bundled cards; to keep the Gmail card, add its entry and `gmail.md` to that folder's `android/`.
 
 **To disable:**
 ```yaml
@@ -289,7 +293,7 @@ mobilerun run "Open Gmail" --reasoning --debug
 Look for these log messages:
 ```
 Loaded android/app_cards.json with 2 entries
-Loaded app card for com.google.android.gm from config/app_cards/android/gmail.md
+Loaded app card for com.google.android.gm from .../config/app_cards/android/gmail.md
 ```
 
 ---

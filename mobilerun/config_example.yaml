@@ -57,7 +57,7 @@ agent:
     enabled: true
     # Mode: local (file-based), server (HTTP API), or composite (server with local fallback)
     mode: local
-    # Directory containing app card files (for local/composite modes)
+    # Directory with android/ and ios/ app card folders (for local/composite modes)
     app_cards_dir: config/app_cards
     # Server URL for remote app cards (for server/composite modes)
     server_url: null

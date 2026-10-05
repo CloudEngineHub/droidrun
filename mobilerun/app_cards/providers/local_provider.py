@@ -23,12 +23,23 @@ def _resolve_cards_folder(app_cards_dir: str) -> Path:
     """Use the working-dir folder if it has app cards, else the package one."""
     path = Path(app_cards_dir).expanduser()
     if path.is_absolute():
+        _warn_if_flat(path)
         return path
     candidates = (Path.cwd() / path, PathResolver.get_project_root() / path)
     for folder in candidates:
+        _warn_if_flat(folder)
         if any((folder / p / _MAPPING_FILE).exists() for p in PLATFORMS):
             return folder
     return candidates[0]
+
+
+def _warn_if_flat(folder: Path) -> None:
+    flat = folder / _MAPPING_FILE
+    if flat.exists():
+        logger.warning(
+            f"Ignoring {flat}: app cards are read from {folder / 'android'} "
+            f"and {folder / 'ios'}"
+        )
 
 
 class LocalAppCardProvider(AppCardProvider):
@@ -60,6 +71,9 @@ class LocalAppCardProvider(AppCardProvider):
                     mapping = json.load(f)
             except Exception as e:
                 logger.warning(f"Failed to load {mapping_path}: {e}")
+                continue
+            if not isinstance(mapping, dict):
+                logger.warning(f"Ignoring {mapping_path}: expected a JSON object")
                 continue
             self._mappings[platform] = (mapping_path.parent, mapping)
             logger.debug(f"Loaded {relative} with {len(mapping)} entries")

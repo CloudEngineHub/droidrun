@@ -62,6 +62,7 @@ Create a `.md` file with guidance about the app in the same folder:
 ## Path Resolution
 
 - Card paths are relative to the platform folder (`android/` or `ios/`), or absolute.
+- An `app_cards.json` directly in `app_cards_dir` is not read; Mobilerun logs a warning and ignores it.
 - A relative `app_cards_dir` is used from the working directory if it contains app cards there, otherwise from the package directory.
 
 ## Finding Package Names
@@ -127,6 +128,7 @@ async def main():
     app_card = await provider.load_app_card(
         package_name="com.google.android.gm",
         instruction="Summarize unread email",
+        platform="android",
     )
     print(app_card)
 

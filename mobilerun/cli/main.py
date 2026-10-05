@@ -836,6 +836,7 @@ async def _setup_portal(
     debug: bool,
     latest: bool = False,
     specific_version: str | None = None,
+    in_place: bool = False,
 ):
     """Internal async function to install and enable the Mobilerun Portal on a device."""
     try:
@@ -870,7 +871,9 @@ async def _setup_portal(
         else:
             # Default: delegate to shared setup_portal()
             success = await setup_portal(
-                device_obj, debug, **portal_version_kwargs(setup_portal)
+                device_obj,
+                debug,
+                **portal_version_kwargs(setup_portal, in_place=in_place),
             )
             if success:
                 console.print(
