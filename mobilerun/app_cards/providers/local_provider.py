@@ -25,9 +25,8 @@ def _resolve_cards_folder(app_cards_dir: str) -> Path:
     if path.is_absolute():
         return path
     candidates = (Path.cwd() / path, PathResolver.get_project_root() / path)
-    names = [f"{platform}/{_MAPPING_FILE}" for platform in PLATFORMS] + [_MAPPING_FILE]
     for folder in candidates:
-        if any((folder / name).exists() for name in names):
+        if any((folder / p / _MAPPING_FILE).exists() for p in PLATFORMS):
             return folder
     return candidates[0]
 
@@ -37,8 +36,7 @@ class LocalAppCardProvider(AppCardProvider):
 
     Layout: <app_cards_dir>/android/app_cards.json and
     <app_cards_dir>/ios/app_cards.json, each mapping an app id to a card
-    file in the same folder. A platform without its own folder uses
-    <app_cards_dir>/app_cards.json, the earlier single-folder layout.
+    file in the same folder.
     """
 
     def __init__(self, app_cards_dir: str = "config/app_cards"):
@@ -50,10 +48,10 @@ class LocalAppCardProvider(AppCardProvider):
         """
         self.app_cards_dir = _resolve_cards_folder(app_cards_dir)
 
-        # platform (None = shared app_cards.json) -> (cards folder, mapping)
-        self._mappings: Dict[str | None, tuple[Path, Dict[str, str]]] = {}
-        for platform in (*PLATFORMS, None):
-            relative = f"{platform}/{_MAPPING_FILE}" if platform else _MAPPING_FILE
+        # platform -> (cards folder, mapping)
+        self._mappings: Dict[str, tuple[Path, Dict[str, str]]] = {}
+        for platform in PLATFORMS:
+            relative = f"{platform}/{_MAPPING_FILE}"
             mapping_path = self.app_cards_dir / relative
             if not mapping_path.exists():
                 continue
@@ -67,7 +65,9 @@ class LocalAppCardProvider(AppCardProvider):
             logger.debug(f"Loaded {relative} with {len(mapping)} entries")
 
         if not self._mappings:
-            logger.warning(f"No app_cards.json found in {self.app_cards_dir}")
+            logger.warning(
+                f"No android/ or ios/ app_cards.json found in {self.app_cards_dir}"
+            )
 
         # Content cache: (package_name, instruction, platform) -> content
         self._content_cache: Dict[tuple[str, str, str | None], str] = {}
@@ -95,7 +95,7 @@ class LocalAppCardProvider(AppCardProvider):
             logger.debug(f"App card cache hit: {package_name}")
             return self._content_cache[cache_key]
 
-        source = self._mappings.get(platform) or self._mappings.get(None)
+        source = self._mappings.get(platform or "")
         if source is None or package_name not in source[1]:
             self._content_cache[cache_key] = ""
             return ""

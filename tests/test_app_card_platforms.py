@@ -43,18 +43,16 @@ def test_local_provider_reads_the_folder_for_each_platform(cards_dir) -> None:
     assert _load(provider, "com.zhiliaoapp.musically", None) == ""
 
 
-def test_single_app_cards_json_is_used_for_a_platform_without_a_folder(
-    tmp_path,
-) -> None:
-    _write_cards(tmp_path, {"com.example.notes": "notes.md"}, {"notes.md": "SHARED"})
+def test_flat_app_cards_json_is_not_read(tmp_path) -> None:
+    _write_cards(tmp_path, {"com.example.notes": "notes.md"}, {"notes.md": "FLAT"})
     _write_cards(
         tmp_path / "ios", {"com.example.notes": "notes.md"}, {"notes.md": "IOS"}
     )
     provider = LocalAppCardProvider(str(tmp_path))
 
-    assert _load(provider, "com.example.notes", "android") == "SHARED"
+    assert _load(provider, "com.example.notes", "android") == ""
     assert _load(provider, "com.example.notes", "ios") == "IOS"
-    assert _load(provider, "com.example.notes", None) == "SHARED"
+    assert _load(provider, "com.example.notes", None) == ""
 
 
 def test_local_provider_ignores_an_invalid_mapping_value(cards_dir) -> None:
