@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -35,6 +36,17 @@ def _load(provider, package, platform):
     return asyncio.run(provider.load_app_card(package, "goal", platform))
 
 
+@pytest.fixture
+def warnings():
+    records = []
+    handler = logging.Handler(level=logging.WARNING)
+    handler.emit = lambda record: records.append(record.getMessage())
+    log = logging.getLogger("mobilerun")
+    log.addHandler(handler)
+    yield records
+    log.removeHandler(handler)
+
+
 def test_local_provider_reads_the_folder_for_each_platform(cards_dir) -> None:
     provider = LocalAppCardProvider(str(cards_dir))
 
@@ -43,7 +55,7 @@ def test_local_provider_reads_the_folder_for_each_platform(cards_dir) -> None:
     assert _load(provider, "com.zhiliaoapp.musically", None) == ""
 
 
-def test_flat_app_cards_json_is_not_read(tmp_path) -> None:
+def test_flat_app_cards_json_is_not_read(tmp_path, warnings) -> None:
     _write_cards(tmp_path, {"com.example.notes": "notes.md"}, {"notes.md": "FLAT"})
     _write_cards(
         tmp_path / "ios", {"com.example.notes": "notes.md"}, {"notes.md": "IOS"}
@@ -53,6 +65,39 @@ def test_flat_app_cards_json_is_not_read(tmp_path) -> None:
     assert _load(provider, "com.example.notes", "android") == ""
     assert _load(provider, "com.example.notes", "ios") == "IOS"
     assert _load(provider, "com.example.notes", None) == ""
+    assert any(f"Ignoring {tmp_path / 'app_cards.json'}" in w for w in warnings)
+
+
+def test_flat_cards_in_the_working_dir_warn_before_the_bundled_fallback(
+    tmp_path, monkeypatch, warnings
+) -> None:
+    from mobilerun.config_manager.path_resolver import PathResolver
+
+    work, package = tmp_path / "work", tmp_path / "package"
+    _write_cards(work / "cards", {"com.app": "a.md"}, {"a.md": "USER FLAT"})
+    _write_cards(
+        package / "cards" / "android", {"com.app": "a.md"}, {"a.md": "BUNDLED"}
+    )
+    monkeypatch.chdir(work)
+    monkeypatch.setattr(PathResolver, "get_project_root", staticmethod(lambda: package))
+    provider = LocalAppCardProvider("cards")
+
+    assert _load(provider, "com.app", "android") == "BUNDLED"
+    assert any(f"Ignoring {work / 'cards' / 'app_cards.json'}" in w for w in warnings)
+
+
+@pytest.mark.parametrize("content", ["null", "3", "true", '["a.md"]'])
+def test_a_mapping_that_is_not_an_object_is_skipped(
+    tmp_path, content, warnings
+) -> None:
+    (tmp_path / "android").mkdir()
+    (tmp_path / "android" / "app_cards.json").write_text(content)
+    _write_cards(tmp_path / "ios", {"com.app": "a.md"}, {"a.md": "IOS"})
+    provider = LocalAppCardProvider(str(tmp_path))
+
+    assert _load(provider, "com.app", "android") == ""
+    assert _load(provider, "com.app", "ios") == "IOS"
+    assert any("expected a JSON object" in w for w in warnings)
 
 
 def test_local_provider_ignores_an_invalid_mapping_value(cards_dir) -> None:

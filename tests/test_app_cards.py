@@ -89,6 +89,7 @@ class AppCardsTest(unittest.TestCase):
         self.assertNotIn("AppCardLoader", readme)
         self.assertIn("LocalAppCardProvider", readme)
         self.assertIn("await provider.load_app_card", readme)
+        self.assertIn('platform="android"', readme)
 
 
 if __name__ == "__main__":

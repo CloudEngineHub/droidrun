@@ -36,7 +36,7 @@ class CompositeAppCardProvider(AppCardProvider):
 
         Args:
             server_url: Base URL of the app card server
-            app_cards_dir: Directory containing local app_cards.json
+            app_cards_dir: Directory containing the android/ and ios/ card folders
             server_timeout: Server request timeout in seconds
             server_max_retries: Number of server retry attempts
         """
