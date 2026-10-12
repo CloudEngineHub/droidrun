@@ -121,11 +121,14 @@ def replay(
             logger.info("🔍 Finding connected device...")
             try:
                 dev = await resolve_android_serial()
-            except AndroidDeviceSelectionError as e:
+            except Exception as e:
+                # Dry runs never touch a device, so any discovery failure is fine.
                 if dry_run:
                     logger.warning(f"⚠️  {e}")
                     return None
-                raise click.ClickException(str(e)) from None
+                if isinstance(e, AndroidDeviceSelectionError):
+                    raise click.ClickException(str(e)) from None
+                raise
             logger.info(f"📱 Using device: {dev}")
             return dev
         else:

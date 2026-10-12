@@ -320,3 +320,33 @@ def test_macro_dry_run_with_multiple_devices_continues_without_device(
 
     assert result.exit_code == 0
     assert devices == [None]
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_macro_replay_when_adb_is_unavailable(monkeypatch, tmp_path, dry_run):
+    from click.testing import CliRunner
+
+    from mobilerun.macro import cli as macro_cli_module
+
+    monkeypatch.delenv("ANDROID_SERIAL", raising=False)
+
+    async def failing_list():
+        raise ConnectionRefusedError("adb server not running")
+
+    devices = []
+
+    async def fake_replay(path, device, *args, **kwargs):
+        devices.append(device)
+
+    monkeypatch.setattr(android_device.adb, "list", failing_list)
+    monkeypatch.setattr(macro_cli_module, "_replay_async", fake_replay)
+
+    args = ["replay", str(tmp_path)] + (["--dry-run"] if dry_run else [])
+    result = CliRunner().invoke(macro_cli_module.macro_cli, args)
+
+    if dry_run:
+        assert result.exit_code == 0
+        assert devices == [None]
+    else:
+        assert isinstance(result.exception, ConnectionRefusedError)
+        assert devices == []
