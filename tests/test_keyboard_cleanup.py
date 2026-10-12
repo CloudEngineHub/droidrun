@@ -236,3 +236,32 @@ def test_external_agent_records_android_serial(monkeypatch):
     assert used == ["emulator-5556"]
     assert agent.android_serial == "emulator-5556"
     assert config.device.serial is None
+
+
+class PortalSetupFailed(Exception):
+    pass
+
+
+def test_agent_records_android_serial_when_portal_setup_fails(monkeypatch):
+    from llama_index.core.llms.mock import MockLLM
+    from llama_index.core.workflow import StartEvent
+
+    agent_module = _agent_module(monkeypatch, "emulator-5556")
+
+    async def failing_setup(device, **kwargs):
+        raise PortalSetupFailed
+
+    def unexpected_driver(*args, **kwargs):
+        raise AssertionError("driver must not be built")
+
+    monkeypatch.setattr(agent_module, "ensure_portal_ready", failing_setup)
+    monkeypatch.setattr(agent_module, "AndroidDriver", unexpected_driver)
+
+    config = MobileConfig(telemetry=TelemetryConfig(enabled=False))
+    agent = agent_module.MobileAgent("Open settings", config=config, llms=MockLLM())
+
+    with pytest.raises(PortalSetupFailed):
+        asyncio.run(agent.start_handler(FakeContext(), StartEvent()))
+
+    assert agent.android_serial == "emulator-5556"
+    assert config.device.serial is None

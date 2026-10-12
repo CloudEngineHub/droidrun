@@ -689,6 +689,8 @@ class MobileAgent(Workflow):
                     raise ValueError("No connected Android devices found.")
                 device_serial = devices[0].serial
 
+            self.android_serial = device_serial
+
             # Auto-setup portal if enabled
             if (
                 self.config.device.auto_setup
@@ -706,7 +708,6 @@ class MobileAgent(Workflow):
                 use_tcp=self.resolved_device_config.use_tcp,
                 portal_mode=self.resolved_device_config.portal_mode,
             )
-            self.android_serial = device_serial
             await driver.connect()
 
         # Captured before the Stealth/Recording wraps: the provider pairing
