@@ -349,7 +349,6 @@ I used one <function_calls> block and will wait for its <function_calls> result.
 </function_calls>"""
         for prose in (
             "I will use a <function_calls> block now:",
-            "Calls go in <function_calls>...</function_calls> tags.",
             "Wrap calls in `<function_calls>` tags.",
         ):
             with self.subTest(prose=prose):
@@ -392,6 +391,8 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "inline_paren": "Here: <function_calls>(open_app Settings)</function_calls>",
             "inline_quoted": 'Here: <function_calls>"open_app"</function_calls>',
             "lone_surrogate": "<function_calls>\n\ud800\n</function_calls>",
+            "inline_closed_words": "Here: <function_calls>click(index=1)</function_calls>",
+            "closed_mention": "Calls go in <function_calls>...</function_calls> tags.",
         }
         for name, first in first_blocks.items():
             with self.subTest(name=name):

@@ -196,10 +196,13 @@ def _count_tool_call_blocks(text: str, end: int) -> int:
 
 
 def _is_prose_mention(before: str, after: str) -> bool:
-    """Whether an opener sits mid-sentence and is followed by a word or punctuation.
+    """Whether an unclosed opener sits mid-sentence before a word or punctuation.
 
-    Anything else after it (a tag, JSON, brackets, quotes) is a block.
+    An opener closed before the next one, or followed by anything else (a
+    tag, JSON, brackets, quotes), is a block.
     """
+    if CLOSE_TAG in after:
+        return False
     line_before = before[before.rfind("\n") + 1 :].strip()
     line_after = after.split("\n", 1)[0].strip()
     return bool(line_before and line_after) and (
