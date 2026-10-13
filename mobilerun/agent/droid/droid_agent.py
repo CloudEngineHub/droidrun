@@ -365,6 +365,8 @@ class MobileAgent(Workflow):
         self._injected_driver = driver
         self._injected_state_provider = state_provider
         self.driver = None
+        # Android serial resolved for this run.
+        self.android_serial = None
         self.registry = None
         self.action_ctx = None
         self.state_provider = None
@@ -560,6 +562,7 @@ class MobileAgent(Workflow):
                 logger.info(f"📱 Using device: {device_serial}")
 
             adb_device = await adb.device(serial=device_serial)
+            self.android_serial = device_serial
 
             logger.info(f"🤖 Using external agent: {agent_name}")
 
@@ -682,6 +685,8 @@ class MobileAgent(Workflow):
             if device_serial is None:
                 device_serial = await resolve_android_serial()
                 logger.info(f"📱 Using device: {device_serial}")
+
+            self.android_serial = device_serial
 
             # Auto-setup portal if enabled
             if (
