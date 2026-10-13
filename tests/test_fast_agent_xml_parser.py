@@ -350,6 +350,7 @@ I used one <function_calls> block and will wait for its <function_calls> result.
         for prose in (
             "I will use a <function_calls> block now:",
             "Calls go in <function_calls>...</function_calls> tags.",
+            "Wrap calls in `<function_calls>` tags.",
         ):
             with self.subTest(prose=prose):
                 text = f"{prose}\n{block}"
@@ -387,6 +388,10 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "unknown_tag": '<function_calls>\n<invoke_tool name="open_app"/>\n</function_calls>',
             "inline_json": 'Here: <function_calls>{"name": "open_app"}</function_calls>',
             "inline_empty": "Done: <function_calls></function_calls>",
+            "inline_array": 'Here: <function_calls>[{"name": "click"}]</function_calls>',
+            "inline_paren": "Here: <function_calls>(open_app Settings)</function_calls>",
+            "inline_quoted": 'Here: <function_calls>"open_app"</function_calls>',
+            "lone_surrogate": "<function_calls>\n\ud800\n</function_calls>",
         }
         for name, first in first_blocks.items():
             with self.subTest(name=name):

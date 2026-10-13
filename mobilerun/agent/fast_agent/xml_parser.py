@@ -32,6 +32,8 @@ _TOOL_CALL_MARKUP_RE = re.compile(
     r"|" + _DSML_MARKUP_PATTERN,
     re.IGNORECASE,
 )
+# Characters that can follow a <function_calls> mentioned in prose.
+_PROSE_PUNCTUATION = "`.,;:!?)"
 # Tool-call markup that marks a non-canonical block between canonical openers.
 _BLOCK_CONTENT_RE = re.compile(
     r"(?:<|＜)\s*/?\s*(?:invoke|parameter)\b|" + _DSML_MARKUP_PATTERN,
@@ -194,10 +196,15 @@ def _count_tool_call_blocks(text: str, end: int) -> int:
 
 
 def _is_prose_mention(before: str, after: str) -> bool:
-    """Whether an opener sits mid-sentence and is followed by words."""
+    """Whether an opener sits mid-sentence and is followed by a word or punctuation.
+
+    Anything else after it (a tag, JSON, brackets, quotes) is a block.
+    """
     line_before = before[before.rfind("\n") + 1 :].strip()
     line_after = after.split("\n", 1)[0].strip()
-    return bool(line_before and line_after) and line_after[0] not in "<＜{"
+    return bool(line_before and line_after) and (
+        line_after[0].isalpha() or line_after[0] in _PROSE_PUNCTUATION
+    )
 
 
 def _mask_canonical_tags(text: str) -> str:
@@ -269,7 +276,7 @@ def _parse_tool_call_block(
 
     try:
         root = ET.fromstring(f"<root>{block}</root>")
-    except ET.ParseError:
+    except (ET.ParseError, UnicodeError):
         logger.warning("Failed to parse tool call XML block, skipping")
         return []
 
