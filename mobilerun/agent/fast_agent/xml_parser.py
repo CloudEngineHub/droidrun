@@ -32,6 +32,11 @@ _TOOL_CALL_MARKUP_RE = re.compile(
     r"|" + _DSML_MARKUP_PATTERN,
     re.IGNORECASE,
 )
+# Tool-call markup that marks a non-canonical block between canonical openers.
+_BLOCK_CONTENT_RE = re.compile(
+    r"(?:<|＜)\s*/?\s*(?:invoke|parameter)\b|" + _DSML_MARKUP_PATTERN,
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -103,7 +108,8 @@ def parse_tool_calls_detailed(
 
     Only the first tool-call block is parsed. If it is malformed (including
     provider markup before the first <function_calls>), the result is
-    malformed even when a later block is valid.
+    malformed even when a later block is valid. A <function_calls> written
+    mid-sentence and followed by words is a prose mention, not a block.
     """
     if OPEN_TAG not in text:
         markup_match = _TOOL_CALL_MARKUP_RE.search(text)
@@ -120,33 +126,42 @@ def parse_tool_calls_detailed(
         )
 
     parts = text.split(OPEN_TAG)
-    leading = _TOOL_CALL_MARKUP_RE.search(parts[0])
+    first = next(
+        (
+            i
+            for i in range(1, len(parts))
+            if not _is_prose_mention(parts[i - 1], parts[i])
+        ),
+        1,
+    )
+    prefix = OPEN_TAG.join(parts[:first])
+    leading = _TOOL_CALL_MARKUP_RE.search(_mask_canonical_tags(prefix))
     if leading:
         # Non-canonical markup before the first opener is the first block.
-        end = len(parts[0])
+        end = len(prefix)
         return ToolCallParseResult(
-            thought=parts[0][: leading.start()].strip(),
+            thought=prefix[: leading.start()].strip(),
             calls=[],
             status=ToolCallParseStatus.MALFORMED,
             end=end,
-            ignored_blocks=_count_tool_call_blocks(text[end:]),
+            ignored_blocks=_count_tool_call_blocks(text, end),
         )
 
-    text_before = parts[0].strip()
-    part = parts[1]
-    part_start = len(parts[0]) + len(OPEN_TAG)
+    text_before = prefix.strip()
+    part = parts[first]
+    part_start = len(prefix) + len(OPEN_TAG)
 
     close_idx = part.find(CLOSE_TAG)
     if close_idx == -1:
         # Unclosed block ends where the next one starts, if any.
-        end = part_start + len(part) if len(parts) > 2 else None
+        end = part_start + len(part) if len(parts) > first + 1 else None
         return ToolCallParseResult(
             thought=text_before,
             calls=[],
             status=ToolCallParseStatus.MALFORMED,
             end=end,
             ignored_blocks=(
-                _count_tool_call_blocks(text[end:]) if end is not None else 0
+                _count_tool_call_blocks(text, end) if end is not None else 0
             ),
         )
 
@@ -164,15 +179,32 @@ def parse_tool_calls_detailed(
         calls=calls,
         status=ToolCallParseStatus.VALID if calls else ToolCallParseStatus.MALFORMED,
         end=end,
-        ignored_blocks=_count_tool_call_blocks(text[end:]),
+        ignored_blocks=_count_tool_call_blocks(text, end),
     )
 
 
-def _count_tool_call_blocks(text: str) -> int:
-    """Count segments with tool-call markup; prose mentioning the tag is not a block."""
-    return sum(
-        1 for segment in text.split(OPEN_TAG) if _TOOL_CALL_MARKUP_RE.search(segment)
+def _count_tool_call_blocks(text: str, end: int) -> int:
+    """Count blocks after offset ``end``; prose mentioning the tag is not a block."""
+    parts = text[end:].split(OPEN_TAG)
+    count = 1 if _BLOCK_CONTENT_RE.search(parts[0]) else 0
+    parts[0] = text[:end] + parts[0]
+    return count + sum(
+        1 for i in range(1, len(parts)) if not _is_prose_mention(parts[i - 1], parts[i])
     )
+
+
+def _is_prose_mention(before: str, after: str) -> bool:
+    """Whether an opener sits mid-sentence and is followed by words."""
+    line_before = before[before.rfind("\n") + 1 :].strip()
+    line_after = after.split("\n", 1)[0].strip()
+    return bool(line_before and line_after) and line_after[0] not in "<＜{"
+
+
+def _mask_canonical_tags(text: str) -> str:
+    """Blank out canonical tags, keeping offsets, so only other markup matches."""
+    for tag in (OPEN_TAG, CLOSE_TAG):
+        text = text.replace(tag, " " * len(tag))
+    return text
 
 
 def format_tool_results(results: List[ToolResult]) -> str:

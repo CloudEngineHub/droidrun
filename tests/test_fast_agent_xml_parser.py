@@ -343,6 +343,74 @@ I used one <function_calls> block and will wait for its <function_calls> result.
         self.assertEqual(result.ignored_blocks, 0)
         self.assertEqual(text[: result.end], f"I will tap Open app.\n{first}")
 
+    def test_prose_mentions_before_first_block_are_skipped(self):
+        block = """<function_calls>
+<invoke name="click"><parameter name="index">1</parameter></invoke>
+</function_calls>"""
+        for prose in (
+            "I will use a <function_calls> block now:",
+            "Calls go in <function_calls>...</function_calls> tags.",
+        ):
+            with self.subTest(prose=prose):
+                text = f"{prose}\n{block}"
+
+                result = parse_tool_calls_detailed(text, {"index": "number"})
+
+                self.assertEqual(result.status, ToolCallParseStatus.VALID)
+                self.assertEqual(result.calls[0].parameters, {"index": 1})
+                self.assertEqual(result.thought, prose)
+                self.assertEqual(result.end, len(text))
+                self.assertEqual(result.ignored_blocks, 0)
+
+    def test_prose_mention_before_malformed_first_block_is_malformed(self):
+        text = """I will use one <function_calls> block:
+<function_calls>
+<invoke name="click"><parameter name="index">1</parameter>
+</function_calls>
+<function_calls>
+<invoke name="complete"><parameter name="success">true</parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+        self.assertEqual(result.calls, [])
+        self.assertEqual(result.ignored_blocks, 1)
+
+    def test_contentless_first_block_is_not_mistaken_for_prose(self):
+        later = """<function_calls>
+<invoke name="click"><parameter name="index">2</parameter></invoke>
+</function_calls>"""
+        first_blocks = {
+            "empty": "<function_calls>\n</function_calls>",
+            "json": '<function_calls>\n{"name": "open_app"}\n</function_calls>',
+            "unknown_tag": '<function_calls>\n<invoke_tool name="open_app"/>\n</function_calls>',
+            "inline_json": 'Here: <function_calls>{"name": "open_app"}</function_calls>',
+            "inline_empty": "Done: <function_calls></function_calls>",
+        }
+        for name, first in first_blocks.items():
+            with self.subTest(name=name):
+                result = parse_tool_calls_detailed(
+                    f"{first}\n{later}", {"index": "number"}
+                )
+
+                self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+                self.assertEqual(result.calls, [])
+                self.assertEqual(result.ignored_blocks, 1)
+
+    def test_later_prose_mentioning_tags_is_not_an_ignored_block(self):
+        text = """<function_calls>
+<invoke name="click"><parameter name="index">2</parameter></invoke>
+</function_calls>
+I used one <function_calls> with an <invoke> tag."""
+
+        for reply in (text, text.replace("\nI used one ", "")):
+            with self.subTest(reply=reply[-40:]):
+                result = parse_tool_calls_detailed(reply, {"index": "number"})
+
+                self.assertEqual(result.status, ToolCallParseStatus.VALID)
+                self.assertEqual(result.ignored_blocks, 0)
+
     def test_ignored_blocks_skip_prose_mentions_between_real_blocks(self):
         text = """I will tap.
 <function_calls>

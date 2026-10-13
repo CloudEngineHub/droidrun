@@ -372,3 +372,17 @@ def test_prose_mention_of_open_tag_does_not_trigger_notice():
     assert registry.executed[0] == ("click", {"index": 1})
     assert shared_state.message_history[1].content == FIRST
     assert IGNORED_NOTICE not in _request_text(llm.requests[1])
+
+
+def test_prose_mention_before_first_block_runs_the_block():
+    reply = _assistant(
+        TextBlock(text=f"I will use one <function_calls> block now.\n{FIRST}")
+    )
+
+    _result, llm, registry, _shared_state = _run(
+        [reply, _assistant(TextBlock(text=FINAL))]
+    )
+
+    assert registry.executed[0] == ("click", {"index": 1})
+    assert "could not be parsed" not in llm.requests[1][-1].content
+    assert IGNORED_NOTICE not in _request_text(llm.requests[1])
