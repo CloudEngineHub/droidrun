@@ -351,8 +351,13 @@ async def _cleanup_android_keyboard(
     if platform == "ios" or control_backend == VISUAL_REMOTE_CONNECTION:
         return
 
+    # Without a selected device the keyboard was never enabled.
+    serial = serial or config.device.serial
+    if not serial:
+        return
+
     try:
-        device_obj = await adb.device(serial or config.device.serial)
+        device_obj = await adb.device(serial)
         if device_obj:
             from mobilerun_core_local.driver.android.portal import (
                 PORTAL_PACKAGE_NAME,

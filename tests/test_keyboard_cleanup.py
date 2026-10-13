@@ -102,14 +102,26 @@ def test_run_cleans_up_on_explicit_serial(monkeypatch, fake_adb):
     assert _serials(fake_adb) == ["emulator-5558"]
 
 
-@pytest.mark.parametrize("device", [None, "emulator-5558"])
-def test_run_falls_back_to_config_serial_without_agent(monkeypatch, fake_adb, device):
+def test_run_falls_back_to_config_serial_without_agent(monkeypatch, fake_adb):
     def failing_agent(**kwargs):
         raise RuntimeError("agent init failed")
 
-    assert _run_cli(monkeypatch, MobileConfig(), failing_agent, device=device) is False
+    assert (
+        _run_cli(monkeypatch, MobileConfig(), failing_agent, device="emulator-5558")
+        is False
+    )
 
-    assert _serials(fake_adb) == [device]
+    assert _serials(fake_adb) == ["emulator-5558"]
+
+
+def test_run_skips_cleanup_when_no_device_was_selected(monkeypatch, fake_adb, capsys):
+    def failing_agent(**kwargs):
+        raise ValueError("Multiple Android devices connected")
+
+    assert _run_cli(monkeypatch, MobileConfig(), failing_agent) is False
+
+    assert fake_adb == []
+    assert "Failed to disable Mobilerun keyboard" not in capsys.readouterr().out
 
 
 def test_cleanup_prefers_resolved_serial_over_config_serial(fake_adb):
