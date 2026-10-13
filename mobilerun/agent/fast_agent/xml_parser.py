@@ -53,11 +53,17 @@ class ToolCallParseStatus(str, Enum):
 
 @dataclass(frozen=True)
 class ToolCallParseResult:
-    """Detailed result used internally to distinguish missing and invalid markup."""
+    """Detailed result used internally to distinguish missing and invalid markup.
+
+    ``end`` is the text offset where the first tool-call block ends;
+    ``ignored_blocks`` counts later blocks that contain tool-call markup.
+    """
 
     thought: str
     calls: List[ToolCall]
     status: ToolCallParseStatus
+    end: Optional[int] = None
+    ignored_blocks: int = 0
 
 
 @dataclass
@@ -93,7 +99,12 @@ def parse_tool_calls(
 def parse_tool_calls_detailed(
     text: str, param_types: Optional[Dict[str, str]] = None
 ) -> ToolCallParseResult:
-    """Parse tool calls and classify whether markup was absent, valid, or malformed."""
+    """Parse tool calls and classify whether markup was absent, valid, or malformed.
+
+    Only the first tool-call block is parsed. If it is malformed (including
+    provider markup before the first <function_calls>), the result is
+    malformed even when a later block is valid.
+    """
     if OPEN_TAG not in text:
         markup_match = _TOOL_CALL_MARKUP_RE.search(text)
         if markup_match:
@@ -109,32 +120,59 @@ def parse_tool_calls_detailed(
         )
 
     parts = text.split(OPEN_TAG)
+    leading = _TOOL_CALL_MARKUP_RE.search(parts[0])
+    if leading:
+        # Non-canonical markup before the first opener is the first block.
+        end = len(parts[0])
+        return ToolCallParseResult(
+            thought=parts[0][: leading.start()].strip(),
+            calls=[],
+            status=ToolCallParseStatus.MALFORMED,
+            end=end,
+            ignored_blocks=_count_tool_call_blocks(text[end:]),
+        )
+
     text_before = parts[0].strip()
+    part = parts[1]
+    part_start = len(parts[0]) + len(OPEN_TAG)
 
-    call_blocks: List[List[ToolCall]] = []
-    for part in parts[1:]:
-        close_idx = part.find(CLOSE_TAG)
-        if close_idx == -1:
-            continue  # Malformed — no closing tag, skip
+    close_idx = part.find(CLOSE_TAG)
+    if close_idx == -1:
+        # Unclosed block ends where the next one starts, if any.
+        end = part_start + len(part) if len(parts) > 2 else None
+        return ToolCallParseResult(
+            thought=text_before,
+            calls=[],
+            status=ToolCallParseStatus.MALFORMED,
+            end=end,
+            ignored_blocks=(
+                _count_tool_call_blocks(text[end:]) if end is not None else 0
+            ),
+        )
 
-        block = part[:close_idx].strip()
-        if not block:
-            continue
-
-        # Parameter-value sanitization intentionally preserves raw text such as
-        # code and literal DSML. Provider-specific markup is malformed only
-        # when it occurs outside a trustworthy canonical parameter payload.
-        if _has_structural_dsml_markup(block):
-            continue
-
+    block = part[:close_idx].strip()
+    calls: List[ToolCall] = []
+    # Parameter-value sanitization intentionally preserves raw text such as
+    # code and literal DSML. Provider-specific markup is malformed only
+    # when it occurs outside a trustworthy canonical parameter payload.
+    if block and not _has_structural_dsml_markup(block):
         calls = _parse_tool_call_block(block, param_types)
-        if calls:
-            call_blocks.append(calls)
 
-    deduped_blocks = _drop_adjacent_duplicate_blocks(call_blocks)
-    calls = [call for block in deduped_blocks for call in block]
-    status = ToolCallParseStatus.VALID if calls else ToolCallParseStatus.MALFORMED
-    return ToolCallParseResult(thought=text_before, calls=calls, status=status)
+    end = part_start + close_idx + len(CLOSE_TAG)
+    return ToolCallParseResult(
+        thought=text_before,
+        calls=calls,
+        status=ToolCallParseStatus.VALID if calls else ToolCallParseStatus.MALFORMED,
+        end=end,
+        ignored_blocks=_count_tool_call_blocks(text[end:]),
+    )
+
+
+def _count_tool_call_blocks(text: str) -> int:
+    """Count segments with tool-call markup; prose mentioning the tag is not a block."""
+    return sum(
+        1 for segment in text.split(OPEN_TAG) if _TOOL_CALL_MARKUP_RE.search(segment)
+    )
 
 
 def format_tool_results(results: List[ToolResult]) -> str:
@@ -246,23 +284,6 @@ def _has_structural_dsml_markup(block: str) -> bool:
         ):
             return True
     return False
-
-
-def _drop_adjacent_duplicate_blocks(
-    blocks: List[List[ToolCall]],
-) -> List[List[ToolCall]]:
-    """Drop exact adjacent duplicate <function_calls> blocks."""
-    if not blocks:
-        return blocks
-
-    deduped = [blocks[0]]
-    for block in blocks[1:]:
-        previous = deduped[-1]
-        if block == previous:
-            logger.debug("Dropping duplicate adjacent tool-call block")
-            continue
-        deduped.append(block)
-    return deduped
 
 
 def _format_param_value(value: Any) -> str:

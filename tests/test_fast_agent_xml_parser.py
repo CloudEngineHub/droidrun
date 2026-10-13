@@ -215,13 +215,14 @@ class FastAgentXmlParserTest(unittest.TestCase):
         self.assertEqual(len(result.calls), 1)
         self.assertEqual(result.calls[0].parameters, {"index": 12})
 
-    def test_valid_sibling_block_wins_over_malformed_block(self):
-        text = """I will retry and then complete.
-<function_calls>
+    def test_malformed_first_block_is_not_replaced_by_valid_sibling(self):
+        malformed = """<function_calls>
 <｜｜DSML｜｜ name="click">
 <parameter name="index">12</parameter>
 </｜｜DSML｜｜>
-</function_calls>
+</function_calls>"""
+        text = f"""I will retry and then complete.
+{malformed}
 <function_calls>
 <invoke name="complete">
 <parameter name="success">true</parameter>
@@ -231,12 +232,177 @@ class FastAgentXmlParserTest(unittest.TestCase):
 
         result = parse_tool_calls_detailed(text, {"success": "boolean"})
 
+        self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+        self.assertEqual(result.calls, [])
+        self.assertEqual(result.thought, "I will retry and then complete.")
+        self.assertEqual(result.ignored_blocks, 1)
+        self.assertTrue(text[: result.end].endswith(malformed))
+
+    def test_returns_only_first_block_of_multi_block_reply(self):
+        first = """<function_calls>
+<invoke name="click"><parameter name="index">1</parameter></invoke>
+</function_calls>"""
+        text = f"""I will tap Open app.
+{first}
+The app has loaded.
+<function_calls>
+<invoke name="click"><parameter name="index">2</parameter></invoke>
+</function_calls>
+Done.
+<function_calls>
+<invoke name="complete"><parameter name="success">true</parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
         self.assertEqual(result.status, ToolCallParseStatus.VALID)
-        self.assertEqual([call.name for call in result.calls], ["complete"])
+        self.assertEqual(result.thought, "I will tap Open app.")
         self.assertEqual(
-            result.calls[0].parameters,
-            {"success": True, "message": "Done"},
+            [(call.name, call.parameters) for call in result.calls],
+            [("click", {"index": 1})],
         )
+        self.assertEqual(result.ignored_blocks, 2)
+        self.assertEqual(text[: result.end], f"I will tap Open app.\n{first}")
+
+    def test_single_block_reports_end_without_ignored_blocks(self):
+        text = """I will tap and scroll.
+<function_calls>
+<invoke name="click"><parameter name="index">1</parameter></invoke>
+<invoke name="swipe"><parameter name="index">2</parameter></invoke>
+</function_calls>
+"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual([call.name for call in result.calls], ["click", "swipe"])
+        self.assertEqual(result.ignored_blocks, 0)
+        self.assertEqual(result.end, len(text.rstrip()))
+
+    def test_xml_error_in_first_block_is_malformed(self):
+        malformed = """<function_calls>
+<invoke name="open_app"><parameter name="text">Settings</parameter>
+</function_calls>"""
+        text = f"""I will open Settings.
+{malformed}
+Settings is open.
+<function_calls>
+<invoke name="click"><parameter name="index">5</parameter></invoke>
+</function_calls>
+Done.
+<function_calls>
+<invoke name="complete"><parameter name="success">true</parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+        self.assertEqual(result.calls, [])
+        self.assertEqual(result.ignored_blocks, 2)
+        self.assertEqual(text[: result.end], f"I will open Settings.\n{malformed}")
+
+    def test_unclosed_first_block_ends_at_next_block(self):
+        unclosed = """I will tap the target.
+<function_calls>
+<invoke name="click"><parameter name="index">12</parameter></invoke>
+Tapped.
+"""
+        text = f"""{unclosed}<function_calls>
+<invoke name="complete"><parameter name="success">true</parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+        self.assertEqual(result.calls, [])
+        self.assertEqual(result.ignored_blocks, 1)
+        self.assertEqual(text[: result.end], unclosed)
+
+    def test_unclosed_only_block_has_no_end(self):
+        text = """I will tap the target.
+<function_calls>
+<invoke name="click"><parameter name="index">12</parameter></invoke>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+        self.assertIsNone(result.end)
+        self.assertEqual(result.ignored_blocks, 0)
+
+    def test_prose_mentions_of_open_tag_are_not_ignored_blocks(self):
+        first = """<function_calls>
+<invoke name="click"><parameter name="index">1</parameter></invoke>
+</function_calls>"""
+        text = f"""I will tap Open app.
+{first}
+I used one <function_calls> block and will wait for its <function_calls> result."""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual(result.status, ToolCallParseStatus.VALID)
+        self.assertEqual([call.name for call in result.calls], ["click"])
+        self.assertEqual(result.ignored_blocks, 0)
+        self.assertEqual(text[: result.end], f"I will tap Open app.\n{first}")
+
+    def test_ignored_blocks_skip_prose_mentions_between_real_blocks(self):
+        text = """I will tap.
+<function_calls>
+<invoke name="click"><parameter name="index">1</parameter></invoke>
+</function_calls>
+Next I would write another <function_calls> block:
+<function_calls>
+<invoke name="click"><parameter name="index">2</parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual([call.parameters for call in result.calls], [{"index": 1}])
+        self.assertEqual(result.ignored_blocks, 1)
+
+    def test_non_canonical_first_block_is_not_replaced_by_later_block(self):
+        first_blocks = {
+            "dsml": """<｜DSML｜tool_calls>
+<｜DSML｜invoke name="click">
+<｜DSML｜parameter name="index">12</｜DSML｜parameter>
+</｜DSML｜invoke>
+</｜DSML｜tool_calls>""",
+            "full_width": """＜function_calls＞
+＜invoke name="click"＞＜parameter name="index"＞12＜/parameter＞＜/invoke＞
+＜/function_calls＞""",
+            "bare_invoke": """<invoke name="click">
+<parameter name="index">12</parameter>
+</invoke>""",
+        }
+        for name, first in first_blocks.items():
+            with self.subTest(name):
+                prefix = f"I will tap the Profile tab.\n{first}\nProfile is open.\n"
+                text = f"""{prefix}<function_calls>
+<invoke name="complete"><parameter name="success">true</parameter></invoke>
+</function_calls>"""
+
+                result = parse_tool_calls_detailed(text, {"success": "boolean"})
+
+                self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+                self.assertEqual(result.calls, [])
+                self.assertEqual(result.thought, "I will tap the Profile tab.")
+                self.assertEqual(result.ignored_blocks, 1)
+                self.assertEqual(text[: result.end], prefix)
+
+    def test_non_canonical_block_after_first_block_is_ignored(self):
+        first = """<function_calls>
+<invoke name="click"><parameter name="index">1</parameter></invoke>
+</function_calls>"""
+        text = f"""I will tap.
+{first}
+<｜DSML｜tool_calls>
+<｜DSML｜invoke name="click"></｜DSML｜invoke>
+</｜DSML｜tool_calls>"""
+
+        result = parse_tool_calls_detailed(text, {"index": "number"})
+
+        self.assertEqual(result.status, ToolCallParseStatus.VALID)
+        self.assertEqual([call.parameters for call in result.calls], [{"index": 1}])
+        self.assertEqual(result.ignored_blocks, 1)
+        self.assertEqual(text[: result.end], f"I will tap.\n{first}")
 
     def test_argument_error_is_valid_markup(self):
         text = """<function_calls>
@@ -390,7 +556,7 @@ The task is done.
         self.assertEqual(calls[0].name, "complete")
         self.assertEqual(calls[0].parameters, {"success": True, "message": "Done"})
 
-    def test_formatted_tool_calls_use_deduped_calls(self):
+    def test_formatted_tool_calls_omit_ignored_blocks(self):
         text = """
 Tap once.
 <function_calls>
