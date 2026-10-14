@@ -20,7 +20,7 @@ OPEN_TAG = "<function_calls>"
 CLOSE_TAG = "</function_calls>"
 
 _PARAM_RE = re.compile(
-    r'(<parameter\s+name="[^"]*">)(.*?)(</parameter>)',
+    r"""(<parameter\s+name=(?:"[^"]*"|'[^']*')\s*>)(.*?)(</parameter>)""",
     re.DOTALL,
 )
 _PARAM_OPEN_RE = re.compile(r"<parameter(?=[\s>/])")
@@ -292,7 +292,7 @@ def _parse_tool_call_block(
         error: Optional[str] = None
         for param in invoke:
             param_name = param.get("name", "")
-            if param.tag != "parameter" or not param_name:
+            if param.tag != "parameter" or not param_name or len(param):
                 logger.warning(
                     "Invalid tool call parameter in XML block, skipping block"
                 )

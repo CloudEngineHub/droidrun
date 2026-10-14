@@ -433,6 +433,10 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "text_call": "click(index=1)",
             "text_inside_invoke": '<invoke name="click">tap<parameter name="index">1</parameter></invoke>',
             "text_after_parameter": '<invoke name="click"><parameter name="index">1</parameter>x</invoke>',
+            "element_in_parameter": (
+                '<invoke name="type"><parameter name="text" kind="x">'
+                "<argument>bad</argument></parameter></invoke>"
+            ),
         }
         for name, first in first_calls.items():
             with self.subTest(name=name):
@@ -455,6 +459,16 @@ I used one <function_calls> block and will wait for its <function_calls> result.
         self.assertEqual(
             result.calls[0].parameters, {"text": "use ＜invoke＞ or <tool_call> here"}
         )
+
+    def test_single_quoted_parameter_value_is_text(self):
+        text = """<function_calls>
+<invoke name="type"><parameter name='text'>a <b>x</b></parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text)
+
+        self.assertEqual(result.status, ToolCallParseStatus.VALID)
+        self.assertEqual(result.calls[0].parameters, {"text": "a <b>x</b>"})
 
     def test_later_prose_mentioning_tags_is_not_an_ignored_block(self):
         text = """<function_calls>
