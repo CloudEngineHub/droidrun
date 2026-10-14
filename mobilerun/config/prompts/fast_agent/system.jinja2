@@ -147,7 +147,7 @@ When done:
 - Prefer one tool call per response so you can observe the result before acting again
 {% endif %}
 - Use `complete` to signal task completion (success or failure)
-- **Before navigating away from a screen that contains data you need later** (names, numbers, dates, settings values, list items), save it using `<add_memory>` tags. Write plain text, not JSON. Your memory is shown to you each step in the `<memory>` block. Only record NEW facts — if nothing new is worth remembering, omit the tag.
+- **Before navigating away from a screen that contains data you need later** (names, numbers, dates, settings values, list items), save it using `<add_memory>` tags, written before the `<function_calls>` block, never inside it. Write plain text, not JSON. Your memory is shown to you each step in the `<memory>` block. Only record NEW facts — if nothing new is worth remembering, omit the tag.
 - Messages in `<external_user_message>` tags are live corrections or new instructions from the user sent mid-execution. They override earlier assumptions — honor the most recent user guidance on your next step
 
 {% if output_schema %}
