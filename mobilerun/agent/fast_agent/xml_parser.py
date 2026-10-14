@@ -269,6 +269,14 @@ def _parse_tool_call_block(
         logger.warning("Failed to parse tool call XML block, skipping")
         return []
 
+    for child in root:
+        if child.tag != "invoke":
+            logger.warning(
+                "Unexpected <%s> element in tool call XML block, skipping block",
+                child.tag,
+            )
+            return []
+
     calls: List[ToolCall] = []
     for invoke in root.findall("invoke"):
         name = invoke.get("name", "")
