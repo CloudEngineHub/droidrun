@@ -428,6 +428,8 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "function_call": '<function_call name="click">1</function_call>',
             "nameless_invoke": '<invoke><parameter name="index">1</parameter></invoke>',
             "unknown_element": '<invoke_tool name="click"/>',
+            "unknown_invoke_child": '<invoke name="click"><argument name="index">1</argument></invoke>',
+            "nameless_parameter": '<invoke name="click"><parameter>1</parameter></invoke>',
         }
         for name, first in first_calls.items():
             with self.subTest(name=name):

@@ -286,17 +286,20 @@ def _parse_tool_call_block(
 
         params: Dict[str, Any] = {}
         error: Optional[str] = None
-        for param in invoke.findall("parameter"):
+        for param in invoke:
             param_name = param.get("name", "")
-            param_value = param.text or ""
-            if param_name:
-                try:
-                    params[param_name] = _coerce_param(
-                        param_name, param_value, param_types
-                    )
-                except ValueError as e:
-                    error = str(e)
-                    break
+            if param.tag != "parameter" or not param_name:
+                logger.warning(
+                    "Invalid tool call parameter in XML block, skipping block"
+                )
+                return []
+            try:
+                params[param_name] = _coerce_param(
+                    param_name, param.text or "", param_types
+                )
+            except ValueError as e:
+                error = str(e)
+                break
 
         calls.append(ToolCall(name=name, parameters=params, error=error))
     return calls
