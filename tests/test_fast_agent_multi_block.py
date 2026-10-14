@@ -387,3 +387,23 @@ def test_tag_mentioned_before_first_block_gets_a_correction():
     correction = llm.requests[1][-1].content
     assert "could not be parsed" in correction
     assert "only inside the call" in correction
+
+
+def test_add_memory_inside_first_block_gets_a_memory_hint():
+    reply = _assistant(
+        TextBlock(
+            text="I will tap Open app.\n<function_calls>\n"
+            "<add_memory>Open app is at index 1.</add_memory>\n"
+            f"{_click(1)}\n</function_calls>"
+        )
+    )
+
+    _result, llm, registry, shared_state = _run(
+        [reply, _assistant(TextBlock(text=FINAL))]
+    )
+
+    assert ("click", {"index": 1}) not in registry.executed
+    correction = llm.requests[1][-1].content
+    assert "before the <function_calls> block, never inside it" in correction
+    assert "memory written inside the block was not saved" in correction
+    assert "Open app is at index 1." not in shared_state.agent_memory

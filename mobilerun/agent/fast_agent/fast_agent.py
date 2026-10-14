@@ -72,7 +72,8 @@ def _malformed_tool_call_correction(attempt: int) -> str:
         "the placeholder names and value with the intended tool and arguments. Do not "
         "use provider-specific markers, full-width punctuation, or alternate tag names, "
         "and write tool-call tags only inside the call, never in your "
-        "explanation.\n\n"
+        "explanation. Write <add_memory> before the <function_calls> block, never "
+        "inside it; memory written inside the block was not saved.\n\n"
         "<function_calls>\n"
         '<invoke name="tool_name">\n'
         '<parameter name="parameter_name">value</parameter>\n'
