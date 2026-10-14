@@ -569,7 +569,7 @@ class FastAgent(Workflow):
 
         results: list[ToolResult] = []
 
-        for call in tool_calls:
+        for index, call in enumerate(tool_calls):
             logger.debug(f"Executing: {call.name}({call.parameters})")
             self.tool_call_counter += 1
 
@@ -628,6 +628,25 @@ class FastAgent(Workflow):
                 )
                 ctx.write_event_to_stream(event)
                 return event
+
+            # Later calls were planned assuming this one succeeded.
+            if not action_result.success:
+                skipped = tool_calls[index + 1 :]
+                if skipped:
+                    logger.info(
+                        "Skipping %d tool call(s) after %s failed",
+                        len(skipped),
+                        call.name,
+                    )
+                    results.extend(
+                        ToolResult(
+                            name=later.name,
+                            output=f"Not executed because {call.name} failed.",
+                            is_error=True,
+                        )
+                        for later in skipped
+                    )
+                break
 
         # Format results
         results_xml = _format_results(results, ignored_blocks)
