@@ -108,10 +108,10 @@ def parse_tool_calls_detailed(
 ) -> ToolCallParseResult:
     """Parse tool calls and classify whether markup was absent, valid, or malformed.
 
-    Only the first tool-call block is parsed. If it is malformed (including
-    provider markup before the first <function_calls>), the result is
-    malformed even when a later block is valid. A <function_calls> written
-    mid-sentence and followed by words is a prose mention, not a block.
+    Only the first tool-call block is parsed: the first <function_calls>
+    always starts it. If it is malformed (including any tool-call markup
+    before that opener), the result is malformed even when a later block is
+    valid.
     """
     if OPEN_TAG not in text:
         markup_match = _TOOL_CALL_MARKUP_RE.search(text)
@@ -128,35 +128,26 @@ def parse_tool_calls_detailed(
         )
 
     parts = text.split(OPEN_TAG)
-    first = next(
-        (
-            i
-            for i in range(1, len(parts))
-            if not _is_prose_mention(parts[i - 1], parts[i])
-        ),
-        1,
-    )
-    prefix = OPEN_TAG.join(parts[:first])
-    leading = _TOOL_CALL_MARKUP_RE.search(_mask_canonical_tags(prefix))
+    leading = _TOOL_CALL_MARKUP_RE.search(parts[0])
     if leading:
-        # Non-canonical markup before the first opener is the first block.
-        end = len(prefix)
+        # Markup before the first opener is the first block.
+        end = len(parts[0])
         return ToolCallParseResult(
-            thought=prefix[: leading.start()].strip(),
+            thought=parts[0][: leading.start()].strip(),
             calls=[],
             status=ToolCallParseStatus.MALFORMED,
             end=end,
             ignored_blocks=_count_tool_call_blocks(text, end),
         )
 
-    text_before = prefix.strip()
-    part = parts[first]
-    part_start = len(prefix) + len(OPEN_TAG)
+    text_before = parts[0].strip()
+    part = parts[1]
+    part_start = len(parts[0]) + len(OPEN_TAG)
 
     close_idx = part.find(CLOSE_TAG)
     if close_idx == -1:
         # Unclosed block ends where the next one starts, if any.
-        end = part_start + len(part) if len(parts) > first + 1 else None
+        end = part_start + len(part) if len(parts) > 2 else None
         return ToolCallParseResult(
             thought=text_before,
             calls=[],
@@ -208,13 +199,6 @@ def _is_prose_mention(before: str, after: str) -> bool:
     return bool(line_before and line_after) and (
         line_after[0].isalpha() or line_after[0] in _PROSE_PUNCTUATION
     )
-
-
-def _mask_canonical_tags(text: str) -> str:
-    """Blank out canonical tags, keeping offsets, so only other markup matches."""
-    for tag in (OPEN_TAG, CLOSE_TAG):
-        text = text.replace(tag, " " * len(tag))
-    return text
 
 
 def format_tool_results(results: List[ToolResult]) -> str:

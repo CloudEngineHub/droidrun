@@ -18,6 +18,7 @@ To call a tool, wrap it in <function_calls> tags:
 </invoke>
 </function_calls>
 
+The <function_calls> tag always starts a tool call. Write tool-call tags only inside the call, never in your explanation.
 Multiple <invoke> blocks in one <function_calls> block are executed sequentially, in order.
 Emit exactly one <function_calls> block per response. If you need multiple actions, put multiple <invoke> blocks inside that single block.
 Do not repeat the same tool call in one response unless the user explicitly asks for repeated identical actions.

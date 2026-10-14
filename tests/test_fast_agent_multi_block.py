@@ -374,7 +374,7 @@ def test_prose_mention_of_open_tag_does_not_trigger_notice():
     assert IGNORED_NOTICE not in _request_text(llm.requests[1])
 
 
-def test_prose_mention_before_first_block_runs_the_block():
+def test_tag_mentioned_before_first_block_gets_a_correction():
     reply = _assistant(
         TextBlock(text=f"I will use one <function_calls> block now.\n{FIRST}")
     )
@@ -383,6 +383,7 @@ def test_prose_mention_before_first_block_runs_the_block():
         [reply, _assistant(TextBlock(text=FINAL))]
     )
 
-    assert registry.executed[0] == ("click", {"index": 1})
-    assert "could not be parsed" not in llm.requests[1][-1].content
-    assert IGNORED_NOTICE not in _request_text(llm.requests[1])
+    assert ("click", {"index": 1}) not in registry.executed
+    correction = llm.requests[1][-1].content
+    assert "could not be parsed" in correction
+    assert "only inside the call" in correction

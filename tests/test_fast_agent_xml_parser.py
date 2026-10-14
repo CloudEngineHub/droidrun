@@ -343,7 +343,7 @@ I used one <function_calls> block and will wait for its <function_calls> result.
         self.assertEqual(result.ignored_blocks, 0)
         self.assertEqual(text[: result.end], f"I will tap Open app.\n{first}")
 
-    def test_prose_mentions_before_first_block_are_skipped(self):
+    def test_tag_mentioned_before_first_block_starts_the_first_block(self):
         block = """<function_calls>
 <invoke name="click"><parameter name="index">1</parameter></invoke>
 </function_calls>"""
@@ -356,11 +356,10 @@ I used one <function_calls> block and will wait for its <function_calls> result.
 
                 result = parse_tool_calls_detailed(text, {"index": "number"})
 
-                self.assertEqual(result.status, ToolCallParseStatus.VALID)
-                self.assertEqual(result.calls[0].parameters, {"index": 1})
-                self.assertEqual(result.thought, prose)
-                self.assertEqual(result.end, len(text))
-                self.assertEqual(result.ignored_blocks, 0)
+                self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+                self.assertEqual(result.calls, [])
+                self.assertEqual(text[: result.end], f"{prose}\n")
+                self.assertEqual(result.ignored_blocks, 1)
 
     def test_prose_mention_before_malformed_first_block_is_malformed(self):
         text = """I will use one <function_calls> block:
@@ -375,9 +374,9 @@ I used one <function_calls> block and will wait for its <function_calls> result.
 
         self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
         self.assertEqual(result.calls, [])
-        self.assertEqual(result.ignored_blocks, 1)
+        self.assertEqual(result.ignored_blocks, 2)
 
-    def test_contentless_first_block_is_not_mistaken_for_prose(self):
+    def test_broken_first_block_wins_over_later_valid_block(self):
         later = """<function_calls>
 <invoke name="click"><parameter name="index">2</parameter></invoke>
 </function_calls>"""
@@ -393,6 +392,8 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "lone_surrogate": "<function_calls>\n\ud800\n</function_calls>",
             "inline_closed_words": "Here: <function_calls>click(index=1)</function_calls>",
             "closed_mention": "Calls go in <function_calls>...</function_calls> tags.",
+            "inline_unclosed_words": "Here: <function_calls>click(index=1)",
+            "stray_close_tag": "Done.</function_calls>",
         }
         for name, first in first_blocks.items():
             with self.subTest(name=name):

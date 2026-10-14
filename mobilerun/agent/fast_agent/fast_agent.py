@@ -70,7 +70,9 @@ def _malformed_tool_call_correction(attempt: int) -> str:
         f"(attempt {attempt}/{_MALFORMED_TOOL_CALL_LIMIT}). No tool was executed.\n\n"
         "Repeat the intended call using only the ASCII XML tags shown below. Replace "
         "the placeholder names and value with the intended tool and arguments. Do not "
-        "use provider-specific markers, full-width punctuation, or alternate tag names.\n\n"
+        "use provider-specific markers, full-width punctuation, or alternate tag names, "
+        "and write tool-call tags only inside the call, never in your "
+        "explanation.\n\n"
         "<function_calls>\n"
         '<invoke name="tool_name">\n'
         '<parameter name="parameter_name">value</parameter>\n'
