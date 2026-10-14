@@ -847,13 +847,14 @@ async def disconnect(serial: str):
 
 
 async def _wait_for_portal_service(
-    device_obj, timeout: float = 10.0, interval: float = 1.0
+    device_obj, timeout: float = 30.0, interval: float = 1.0
 ) -> bool:
     """Wait until Portal's accessibility service responds.
 
     Android drops the service when it is enabled before a fresh install is
     registered, so it is enabled again while waiting. ``/ping`` answers once
-    the service is bound, even without an active window.
+    the service is bound, even without an active window. A busy device can
+    take well over 10s to bind it.
     """
     uri = portal_content_uri(PORTAL_PACKAGE_NAME, "ping")
     loop = asyncio.get_running_loop()
