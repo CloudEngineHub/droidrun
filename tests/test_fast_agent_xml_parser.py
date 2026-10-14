@@ -394,6 +394,7 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "closed_mention": "Calls go in <function_calls>...</function_calls> tags.",
             "inline_unclosed_words": "Here: <function_calls>click(index=1)",
             "stray_close_tag": "Done.</function_calls>",
+            "full_width_stray_close_tag": "Done.＜／function_calls＞",
         }
         for name, first in first_blocks.items():
             with self.subTest(name=name):
