@@ -28,7 +28,7 @@ _PARAM_OPEN_RE = re.compile(r"<parameter(?=[\s>/])")
 _DSML_MARKUP_PATTERN = r"(?:<|＜)\s*[/／]?\s*｜+DSML｜+"
 _DSML_MARKUP_RE = re.compile(_DSML_MARKUP_PATTERN, re.IGNORECASE)
 _TOOL_CALL_MARKUP_RE = re.compile(
-    r"(?:<|＜)\s*[/／]?\s*(?:function_calls|invoke|parameter)\b"
+    r"(?:<|＜)\s*[/／]?\s*(?:function_calls?|tool_calls?|invoke|parameter)\b"
     r"|" + _DSML_MARKUP_PATTERN,
     re.IGNORECASE,
 )
@@ -36,7 +36,8 @@ _TOOL_CALL_MARKUP_RE = re.compile(
 _PROSE_PUNCTUATION = "`.,;:!?)"
 # Tool-call markup that marks a non-canonical block between canonical openers.
 _BLOCK_CONTENT_RE = re.compile(
-    r"(?:<|＜)\s*[/／]?\s*(?:invoke|parameter)\b|" + _DSML_MARKUP_PATTERN,
+    r"(?:<|＜)\s*[/／]?\s*(?:function_call|tool_calls?|invoke|parameter)\b|"
+    + _DSML_MARKUP_PATTERN,
     re.IGNORECASE,
 )
 

@@ -395,6 +395,9 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "inline_unclosed_words": "Here: <function_calls>click(index=1)",
             "stray_close_tag": "Done.</function_calls>",
             "full_width_stray_close_tag": "Done.＜／function_calls＞",
+            "tool_calls_wrapper": '<tool_calls>{"name": "click"}</tool_calls>',
+            "tool_call_wrapper": '<tool_call>{"name": "click"}</tool_call>',
+            "function_call_wrapper": '<function_call name="click">1</function_call>',
         }
         for name, first in first_blocks.items():
             with self.subTest(name=name):
@@ -405,6 +408,14 @@ I used one <function_calls> block and will wait for its <function_calls> result.
                 self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
                 self.assertEqual(result.calls, [])
                 self.assertEqual(result.ignored_blocks, 1)
+
+    def test_alternate_wrapper_without_canonical_block_is_malformed(self):
+        result = parse_tool_calls_detailed(
+            'I will tap it.\n<tool_call>{"name": "click"}</tool_call>'
+        )
+
+        self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+        self.assertEqual(result.thought, "I will tap it.")
 
     def test_later_prose_mentioning_tags_is_not_an_ignored_block(self):
         text = """<function_calls>
