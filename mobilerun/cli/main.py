@@ -19,12 +19,14 @@ from async_adbutils import adb
 from mobilerun_core_local.driver.android.portal import (
     DOWNLOAD_BASE,
     PORTAL_PACKAGE_NAME,
+    check_portal_accessibility,
     download_portal_apk,
     download_versioned_portal_apk,
     enable_portal_accessibility,
     ping_portal,
     ping_portal_content,
     ping_portal_tcp,
+    portal_content_uri,
     setup_portal,
 )
 from mobilerun_core_local.driver.ios import discover_ios_device, validate_ios_portal_url
@@ -35,6 +37,10 @@ from rich.text import Text
 
 from mobilerun import MobileAgent, ResultEvent
 from mobilerun.agent.external import list_agents
+from mobilerun.agent.utils.android_device import (
+    AndroidDeviceSelectionError,
+    resolve_android_serial,
+)
 from mobilerun.agent.utils.errors import describe_error
 from mobilerun.agent.utils.llm_picker import load_llm
 from mobilerun.agent.utils.oauth.openai_oauth_llm import (
@@ -170,6 +176,7 @@ async def run_command(
     debug_mode = debug if debug is not None else config.logging.debug
     _setup_cli_logging(debug_mode)
     logger = logging.getLogger("mobilerun")
+    droid_agent = None
 
     try:
         logger.info(f"🚀 Starting: {command}")
@@ -337,17 +344,26 @@ async def run_command(
             logger.debug(traceback.format_exc())
         return False
     finally:
-        await _cleanup_android_keyboard(config)
+        await _cleanup_android_keyboard(
+            config, getattr(droid_agent, "android_serial", None)
+        )
 
 
-async def _cleanup_android_keyboard(config: MobileConfig) -> None:
+async def _cleanup_android_keyboard(
+    config: MobileConfig, serial: str | None = None
+) -> None:
     platform = (config.device.platform or "").lower()
     control_backend = (config.device.control_backend or "").lower()
     if platform == "ios" or control_backend == VISUAL_REMOTE_CONNECTION:
         return
 
+    # Without a selected device the keyboard was never enabled.
+    serial = serial or config.device.serial
+    if not serial:
+        return
+
     try:
-        device_obj = await adb.device(config.device.serial)
+        device_obj = await adb.device(serial)
         if device_obj:
             from mobilerun_core_local.driver.android.portal import (
                 PORTAL_PACKAGE_NAME,
@@ -830,6 +846,32 @@ async def disconnect(serial: str):
         console.print(f"[red]Error disconnecting from device: {e}[/]")
 
 
+async def _wait_for_portal_service(
+    device_obj, timeout: float = 30.0, interval: float = 1.0
+) -> bool:
+    """Wait until Portal's accessibility service responds.
+
+    Android drops the service when it is enabled before a fresh install is
+    registered, so it is enabled again while waiting. ``/ping`` answers once
+    the service is bound, even without an active window. A busy device can
+    take well over 10s to bind it.
+    """
+    uri = portal_content_uri(PORTAL_PACKAGE_NAME, "ping")
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        try:
+            result = await device_obj.shell(f"content query --uri {uri}")
+            if '"status":"success"' in result:
+                return True
+            if not await check_portal_accessibility(device_obj):
+                await enable_portal_accessibility(device_obj)
+        except Exception:
+            pass
+        await asyncio.sleep(interval)
+    return False
+
+
 async def _setup_portal(
     path: str | None,
     device: str | None,
@@ -841,12 +883,11 @@ async def _setup_portal(
     """Internal async function to install and enable the Mobilerun Portal on a device."""
     try:
         if not device:
-            devices = await adb.list()
-            if not devices:
-                console.print("[yellow]No devices connected.[/]")
+            try:
+                device = await resolve_android_serial()
+            except AndroidDeviceSelectionError as e:
+                console.print(f"[bold red]Error:[/] {e}")
                 return
-
-            device = devices[0].serial
             console.print(f"[blue]Using device:[/] {device}")
 
         device_obj = await adb.device(device)
@@ -894,7 +935,11 @@ async def _setup_portal(
             console.print(f"[bold blue]Step 1/2: Installing APK:[/] {apk_path}")
             try:
                 await device_obj.install(
-                    apk_path, uninstall=True, flags=["-g"], silent=not debug
+                    apk_path,
+                    nolaunch=True,
+                    uninstall=True,
+                    flags=["-g"],
+                    silent=not debug,
                 )
             except Exception as e:
                 console.print(f"[bold red]Installation failed:[/] {e}")
@@ -906,6 +951,8 @@ async def _setup_portal(
 
             try:
                 await enable_portal_accessibility(device_obj)
+                if not await _wait_for_portal_service(device_obj):
+                    raise RuntimeError("the service did not respond in time")
 
                 console.print("[green]Accessibility service enabled successfully![/]")
                 console.print(
