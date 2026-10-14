@@ -32,6 +32,7 @@ _TOOL_CALL_MARKUP_RE = re.compile(
     r"|" + _DSML_MARKUP_PATTERN,
     re.IGNORECASE,
 )
+_CANONICAL_BLOCK_TAGS = ("<invoke", "</invoke", "<parameter", "</parameter")
 # Characters that can follow a <function_calls> mentioned in prose.
 _PROSE_PUNCTUATION = "`.,;:!?)"
 # Tool-call markup that marks a non-canonical block between canonical openers.
@@ -164,7 +165,7 @@ def parse_tool_calls_detailed(
     # Parameter-value sanitization intentionally preserves raw text such as
     # code and literal DSML. Provider-specific markup is malformed only
     # when it occurs outside a trustworthy canonical parameter payload.
-    if block and not _has_structural_dsml_markup(block):
+    if block and not _has_noncanonical_markup(block):
         calls = _parse_tool_call_block(block, param_types)
 
     end = part_start + close_idx + len(CLOSE_TAG)
@@ -272,7 +273,8 @@ def _parse_tool_call_block(
     for invoke in root.findall("invoke"):
         name = invoke.get("name", "")
         if not name:
-            continue
+            logger.warning("Tool call without a name in XML block, skipping block")
+            return []
 
         params: Dict[str, Any] = {}
         error: Optional[str] = None
@@ -292,8 +294,10 @@ def _parse_tool_call_block(
     return calls
 
 
-def _has_structural_dsml_markup(block: str) -> bool:
-    """Return whether DSML occurs outside a trustworthy parameter payload."""
+def _has_noncanonical_markup(block: str) -> bool:
+    """Return whether tool-call markup other than plain <invoke>/<parameter>
+    tags (DSML, full-width or alternate tags) occurs outside a trustworthy
+    parameter payload."""
     payload_spans: List[Tuple[int, int]] = []
     for parameter in _PARAM_RE.finditer(block):
         payload = parameter.group(2)
@@ -304,7 +308,9 @@ def _has_structural_dsml_markup(block: str) -> bool:
             continue
         payload_spans.append(parameter.span(2))
 
-    for marker in _DSML_MARKUP_RE.finditer(block):
+    for marker in _TOOL_CALL_MARKUP_RE.finditer(block):
+        if marker.group(0) in _CANONICAL_BLOCK_TAGS:
+            continue
         if not any(
             start <= marker.start() and marker.end() <= end
             for start, end in payload_spans

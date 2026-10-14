@@ -417,6 +417,39 @@ I used one <function_calls> block and will wait for its <function_calls> result.
         self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
         self.assertEqual(result.thought, "I will tap it.")
 
+    def test_broken_call_inside_first_block_makes_it_malformed(self):
+        complete = (
+            '<invoke name="complete">'
+            '<parameter name="success">true</parameter></invoke>'
+        )
+        first_calls = {
+            "full_width_invoke": '＜invoke name="click"＞＜/invoke＞',
+            "tool_call": '<tool_call>{"name": "click"}</tool_call>',
+            "function_call": '<function_call name="click">1</function_call>',
+            "nameless_invoke": '<invoke><parameter name="index">1</parameter></invoke>',
+        }
+        for name, first in first_calls.items():
+            with self.subTest(name=name):
+                result = parse_tool_calls_detailed(
+                    f"<function_calls>\n{first}\n{complete}\n</function_calls>",
+                    {"index": "number"},
+                )
+
+                self.assertEqual(result.status, ToolCallParseStatus.MALFORMED)
+                self.assertEqual(result.calls, [])
+
+    def test_tool_markup_inside_parameter_value_is_text(self):
+        text = """<function_calls>
+<invoke name="type"><parameter name="text">use ＜invoke＞ or <tool_call> here</parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text)
+
+        self.assertEqual(result.status, ToolCallParseStatus.VALID)
+        self.assertEqual(
+            result.calls[0].parameters, {"text": "use ＜invoke＞ or <tool_call> here"}
+        )
+
     def test_later_prose_mentioning_tags_is_not_an_ignored_block(self):
         text = """<function_calls>
 <invoke name="click"><parameter name="index">2</parameter></invoke>
