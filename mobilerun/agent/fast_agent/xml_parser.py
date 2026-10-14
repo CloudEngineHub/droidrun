@@ -262,6 +262,11 @@ def _parse_tool_call_block(
     block: str, param_types: Optional[Dict[str, str]]
 ) -> List[ToolCall]:
     block = _sanitize_param_content(block)
+    # Comments and processing instructions are dropped by the XML parser,
+    # which would hide them from the checks below.
+    if "<!" in block or "<?" in block:
+        logger.warning("Comment or declaration in tool call XML block, skipping block")
+        return []
 
     try:
         root = ET.fromstring(f"<root>{block}</root>")

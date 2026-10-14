@@ -433,6 +433,9 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "text_call": "click(index=1)",
             "text_inside_invoke": '<invoke name="click">tap<parameter name="index">1</parameter></invoke>',
             "text_after_parameter": '<invoke name="click"><parameter name="index">1</parameter>x</invoke>',
+            "comment": "<!-- click(index=1) -->",
+            "processing_instruction": "<?call click(index=1)?>",
+            "cdata": "<![CDATA[click(index=1)]]>",
             "element_in_parameter": (
                 '<invoke name="type"><parameter name="text" kind="x">'
                 "<argument>bad</argument></parameter></invoke>"
@@ -459,6 +462,16 @@ I used one <function_calls> block and will wait for its <function_calls> result.
         self.assertEqual(
             result.calls[0].parameters, {"text": "use ＜invoke＞ or <tool_call> here"}
         )
+
+    def test_comment_like_text_inside_parameter_value_is_text(self):
+        text = """<function_calls>
+<invoke name="type"><parameter name="text">a <!-- b --> <?x?></parameter></invoke>
+</function_calls>"""
+
+        result = parse_tool_calls_detailed(text)
+
+        self.assertEqual(result.status, ToolCallParseStatus.VALID)
+        self.assertEqual(result.calls[0].parameters, {"text": "a <!-- b --> <?x?>"})
 
     def test_single_quoted_parameter_value_is_text(self):
         text = """<function_calls>
