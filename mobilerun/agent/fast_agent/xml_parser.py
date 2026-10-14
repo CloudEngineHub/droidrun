@@ -269,6 +269,10 @@ def _parse_tool_call_block(
         logger.warning("Failed to parse tool call XML block, skipping")
         return []
 
+    if _has_text_outside_parameters(root):
+        logger.warning("Text outside tool calls in XML block, skipping block")
+        return []
+
     for child in root:
         if child.tag != "invoke":
             logger.warning(
@@ -303,6 +307,15 @@ def _parse_tool_call_block(
 
         calls.append(ToolCall(name=name, parameters=params, error=error))
     return calls
+
+
+def _has_text_outside_parameters(root: ET.Element) -> bool:
+    """Return whether the block has text anywhere except inside parameter values."""
+    texts = [root.text]
+    for invoke in root:
+        texts += [invoke.tail, invoke.text]
+        texts += [param.tail for param in invoke]
+    return any(text and text.strip() for text in texts)
 
 
 def _has_noncanonical_markup(block: str) -> bool:

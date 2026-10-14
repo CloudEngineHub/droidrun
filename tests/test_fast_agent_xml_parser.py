@@ -430,6 +430,9 @@ I used one <function_calls> block and will wait for its <function_calls> result.
             "unknown_element": '<invoke_tool name="click"/>',
             "unknown_invoke_child": '<invoke name="click"><argument name="index">1</argument></invoke>',
             "nameless_parameter": '<invoke name="click"><parameter>1</parameter></invoke>',
+            "text_call": "click(index=1)",
+            "text_inside_invoke": '<invoke name="click">tap<parameter name="index">1</parameter></invoke>',
+            "text_after_parameter": '<invoke name="click"><parameter name="index">1</parameter>x</invoke>',
         }
         for name, first in first_calls.items():
             with self.subTest(name=name):
