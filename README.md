@@ -63,7 +63,7 @@ Use the framework when you want to run the agent on your machine. Use [Mobilerun
 
 | Target | Supported | Setup |
 | --- | :---: | --- |
-| Android Real Device | ✅ | `adb` + USB debugging enabled & authorized |
+| Android Real Device | ✅ | `adb` + USB debugging enabled & authorized, or no ADB: the [Portal](https://github.com/droidrun/mobilerun-portal) app's HTTP server (`--device http://<phone-ip>:8080` + Portal token) |
 | Android Emulator | ✅ | Android SDK + a running emulator (`adb`) |
 | iOS Real Device | ✅ | iPhone over USB + [`mobilerun-ios --local`](https://docs.mobilerun.ai/framework/guides/device-setup) |
 | iOS Simulator | ✅ | Xcode + the [iOS Portal](https://github.com/droidrun/ios-portal) app on a booted simulator |
