@@ -57,18 +57,18 @@
 - 📸 Combine accessibility trees with screenshots for visual understanding
 - 🫆 Trace execution with Arize Phoenix or Langfuse
 
-Use the framework when you want to run the agent on your machine. Use [Mobilerun Cloud](https://cloud.mobilerun.ai) when you want a ready-to-go solution for your local phones or cloud-hosted Android phones, managed infrastructure, and API-driven device workflows without running the agent on your local machine. [Check out our benchmark results](https://mobilerun.ai/benchmark).
+Use the framework when you want to run the agent on your machine. Use [Mobilerun Cloud](https://cloud.mobilerun.ai) when you want a ready-to-go solution for your local phones or cloud-hosted virtual/physical phones, managed infrastructure, and API-driven device workflows without running the agent on your local machine. [Check out our benchmark results](https://mobilerun.ai/benchmark).
 
 ## 🎯 Platform Support
 
 | Target | Supported | Setup |
 | --- | :---: | --- |
-| Android Real Device | ✅ | `adb` + USB debugging enabled & authorized, or no ADB: the [Portal](https://github.com/droidrun/mobilerun-portal) app's HTTP server (`--device http://<phone-ip>:8080` + Portal token) |
-| Android Emulator | ✅ | Android SDK + a running emulator (`adb`) |
-| iOS Real Device | ✅ | iPhone over USB + [`mobilerun-ios --local`](https://docs.mobilerun.ai/framework/guides/device-setup) |
-| iOS Simulator | ✅ | Xcode + the [iOS Portal](https://github.com/droidrun/ios-portal) app on a booted simulator |
-| Android on Mobilerun Cloud | ✅ | Hosted Android phones, or [your own Android](https://docs.mobilerun.ai/guides/connect-android) with just the [Portal](https://github.com/droidrun/mobilerun-portal) app (no ADB), on [Mobilerun Cloud](https://cloud.mobilerun.ai) |
-| iOS on Mobilerun Cloud | ✅ | [Your own iPhone](https://docs.mobilerun.ai/guides/connect-iphone), connected through `mobilerun-ios` |
+| Android Real Device | ✅ | `adb` or the [Portal](https://github.com/droidrun/mobilerun-portal) app |
+| Android Emulator | ✅ | Running emulator (`adb`) |
+| iOS Real Device | ✅ | [`mobilerun-ios`](https://docs.mobilerun.ai/framework/guides/device-setup) over USB |
+| iOS Simulator | ✅ | [iOS Portal](https://github.com/droidrun/ios-portal) app |
+| Android on [Mobilerun Cloud](https://mobilerun.ai) | ✅ | Hosted phones or your own |
+| iOS on [Mobilerun Cloud](https://mobilerun.ai) | ✅ | Hosted iPhones or your own |
 
 ## 📦 Installation
 
@@ -162,7 +162,7 @@ Read the full [framework documentation](https://docs.mobilerun.ai/framework/quic
 
 | | Mobilerun Framework | Mobilerun Cloud |
 | --- | --- | --- |
-| Best for | Running agents locally on your own machine and devices | Ready-to-go local phone control, hosted Android phones, API workflows, and managed device operations |
+| Best for | Running agents locally on your own machine and devices | Ready-to-go local phone control, hosted real or virtual devices, API workflows, and managed device operations |
 | Runtime | Your machine  | Mobilerun-managed infrastructure |
 | Interface | CLI, Docker, and Python API | Dashboard, REST API, SDKs, and hosted devices |
 
@@ -177,8 +177,9 @@ Use the framework when you want full local control of the agent runtime. Use [Mo
 
 | Device type | What it is | Best for |
 | --- | --- | --- |
-| Personal | Your own Android phone or iPhone connected to Mobilerun Cloud | Quick automation on devices you own |
-| Android Phone (Hosted) | Dedicated cloud-hosted virtual Android phone | Scalable hosted automation |
+| Personal | Your own hardware connected to Mobilerun Cloud | Quick automation on devices you own |
+| Cloud Phone (Hosted) | Instantly available cloud-hosted phone | Scalable hosted automation |
+| Physical Phone (Hosted) | Real hardware with stronger identity characteristics | Workflows that need high device authenticity and trust |
 
 ### Automate WhatsApp on a Cloud Phone
 
@@ -202,7 +203,7 @@ Set up https://github.com/droidrun/mobile-harness for me.
 Read `install.md` and follow the steps to install `mobile-harness`.
 ```
 
-The skill teaches the agent to drive local devices (ADB, Portal, iPhones via `mobilerun-ios`, iOS Simulator) and Mobilerun Cloud phones.
+The skill teaches the agent to drive local devices (ADB, Portal, iPhones, iOS Simulator) and Mobilerun Cloud phones.
 
 ## 🎬 Demo Videos
 
@@ -235,11 +236,11 @@ Shows browsing, app navigation, and result extraction from a natural-language ta
 
 Mobilerun is one piece of a toolkit for driving real phones with AI agents:
 
-- **[Mobilerun Portal](https://github.com/droidrun/mobilerun-portal)**: the Android app the framework talks to. It provides the accessibility tree, screenshots, gestures, and text input.
+- **[Mobilerun Portal](https://github.com/droidrun/mobilerun-portal)**: the Android app that lets you control and automate your phone.
 - **[mobilerun-ios](https://github.com/droidrun/mobilerun-ios-releases)**: connects an iPhone over USB, either to this framework (`--local`) or to Mobilerun Cloud.
 - **[iOS Portal](https://github.com/droidrun/ios-portal)**: the iOS app that lets the framework drive the iOS Simulator.
-- **[mobile-harness](https://github.com/droidrun/mobile-harness)**: an agent skill that lets Claude Code, Codex, and other coding agents control Android, iOS, and cloud phones directly.
-- **[Mobilerun Cloud](https://mobilerun.ai)**: the same stack, hosted. Get hosted Android phones and remote access to your own phones, plus a REST API and SDKs for [Python](https://github.com/droidrun/mobilerun-sdk-python) and [TypeScript](https://github.com/droidrun/mobilerun-sdk-typescript).
+- **[mobile-harness](https://github.com/droidrun/mobile-harness)**: an agent skill that lets Claude Code, Codex, and OpenClaw control Android, iOS, and cloud phones. App cards teach the agent how each app works, and shared memory keeps what it learns across tasks. It scores 100% on AndroidWorld and 98.34% on iOSWorld ([benchmark results](https://mobilerun.ai/benchmark/)).
+- **[Mobilerun Cloud](https://mobilerun.ai)**: cloud phones for AI agents. Hosted Android phones and dedicated iPhones, real numbers and inboxes for SMS and email codes, residential and mobile IPs in any region, scheduled and event triggers, and mobilerun VA, a no-code assistant for mobile tasks. Drive it through the REST API, [Python](https://github.com/droidrun/mobilerun-sdk-python) and [TypeScript](https://github.com/droidrun/mobilerun-sdk-typescript) SDKs, or MCP, and watch every step live.
 
 ## 📚 Documentation
 
