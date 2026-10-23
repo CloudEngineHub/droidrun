@@ -328,3 +328,17 @@ def test_retries_accept_tool_call_only_responses_and_forward_kwargs():
 
     assert response.message.blocks[0].tool_call_id == "call_1"
     assert calls == [{"tools": [{"name": "click"}]}]
+
+
+def test_openai_and_xai_llms_use_native_tools(monkeypatch):
+    from mobilerun.agent.utils.llm_picker import load_llm
+    from mobilerun.agent.utils.oauth.grok_oauth_llm import GrokOAuth
+    from mobilerun.agent.utils.oauth.openai_oauth_llm import OpenAIOAuth
+
+    monkeypatch.setenv("OPENAI_API_KEY", "stub")
+    monkeypatch.setenv("XAI_API_KEY", "stub")
+
+    assert load_llm("OpenAIResponses", model="gpt-6-luna").supports_native_tool_calls
+    assert load_llm("XAI", model="grok-4.6").supports_native_tool_calls
+    assert OpenAIOAuth.supports_native_tool_calls
+    assert GrokOAuth.supports_native_tool_calls
