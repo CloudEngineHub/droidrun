@@ -1465,7 +1465,7 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "aiohttp", specifier = ">=3.14.4" },
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.67.0" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.67.0,<2" },
     { name = "anyio", specifier = ">=4.14.2" },
     { name = "async-adbutils" },
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.8.6" },
@@ -1508,7 +1508,7 @@ provides-extras = ["anthropic", "deepseek", "dev", "langfuse"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "anthropic", specifier = ">=0.67.0" },
+    { name = "anthropic", specifier = ">=0.67.0,<2" },
     { name = "bandit", specifier = ">=1.8.6" },
     { name = "llama-index-callbacks-arize-phoenix", specifier = ">=0.6.1" },
     { name = "llama-index-llms-anthropic", specifier = ">=0.8.6,<0.9.0" },

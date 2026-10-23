@@ -64,7 +64,7 @@ Documentation = "https://docs.mobilerun.ai/"
 
 [project.optional-dependencies]
 anthropic = [
-    "anthropic>=0.67.0",
+    "anthropic>=0.67.0,<2",
     "llama-index-llms-anthropic>=0.8.6,<0.9.0",
 ]
 deepseek = []
@@ -184,7 +184,7 @@ contents = ["mobilerun.tools.cloud.MobileRunTools.*"]
 
 [dependency-groups]
 dev = [
-    "anthropic>=0.67.0",
+    "anthropic>=0.67.0,<2",
     "bandit>=1.8.6",
     "llama-index-callbacks-arize-phoenix>=0.6.1",
     "llama-index-llms-anthropic>=0.8.6,<0.9.0",
