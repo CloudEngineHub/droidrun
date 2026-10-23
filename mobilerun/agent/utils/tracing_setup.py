@@ -91,10 +91,10 @@ def _setup_phoenix_tracing() -> bool:
         from mobilerun.telemetry.phoenix import arize_phoenix_callback_handler
     except ImportError:
         logger.warning(
-            "⚠️  Arize Phoenix is not installed.\n"
-            "    To enable Phoenix integration, install with:\n"
-            "    • If installed via tool: `uv tool install mobilerun[phoenix]`"
-            "    • If installed via pip: `uv pip install mobilerun[phoenix]`\n"
+            "⚠️  Phoenix tracing dependencies are missing.\n"
+            "    Reinstall Mobilerun to restore them:\n"
+            "    • If installed via tool: `uv tool install --reinstall mobilerun`\n"
+            "    • If installed via pip: `uv pip install --reinstall mobilerun`\n"
         )
         return False
 
