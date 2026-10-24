@@ -716,6 +716,20 @@ def _load_anthropic(**kwargs: Any) -> LLM:
     return MobilerunAnthropic(**filtered_kwargs)
 
 
+def _load_deepseek(**kwargs: Any) -> LLM:
+    from llama_index.llms.openai_like import OpenAILike
+
+    class MobilerunDeepSeek(OpenAILike):
+        supports_native_tool_calls: ClassVar[bool] = True
+        native_tool_api: ClassVar[str] = "chat_completions"
+
+    filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    logger.debug(
+        f"Initializing MobilerunDeepSeek with kwargs: {list(filtered_kwargs.keys())}"
+    )
+    return MobilerunDeepSeek(**filtered_kwargs)
+
+
 def load_llm(provider_name: str, model: str | None = None, **kwargs: Any) -> LLM:
     """Load and initialize a configured LLM backend.
 
@@ -850,6 +864,7 @@ def load_llm(provider_name: str, model: str | None = None, **kwargs: Any) -> LLM
         if "base_url" in kwargs and "api_base" not in kwargs:
             kwargs["api_base"] = kwargs.pop("base_url")
         kwargs.setdefault("api_base", "https://api.deepseek.com")
+        return _load_deepseek(**kwargs)
 
     # --- Standard providers (inline dispatch) ---
     if provider_name == "OpenAIResponses":

@@ -35,6 +35,7 @@ from mobilerun.agent.fast_agent.events import (
     FastAgentToolCallEvent,
 )
 from mobilerun.agent.fast_agent.native_tools import (
+    native_tool_kwargs,
     parse_native_tool_calls,
     tool_result_messages,
 )
@@ -432,11 +433,9 @@ class FastAgent(Workflow):
         logger.info("FastAgent response:", extra={"color": "yellow"})
         chat_kwargs = {}
         if self.native_tools:
-            chat_kwargs = {
-                "tools": self.tool_specs,
-                "tool_choice": "required",
-                "parallel_tool_calls": self.config.parallel_tools,
-            }
+            chat_kwargs = native_tool_kwargs(
+                self.llm, self.tool_specs, self.config.parallel_tools
+            )
         response = await acall_with_retries(
             self.llm,
             messages_to_send,

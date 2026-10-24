@@ -20,6 +20,13 @@ from mobilerun.agent.utils.chat_utils import limit_history
 from mobilerun.agent.utils.inference import acall_with_retries
 
 FAILING_INDEX = 99
+CLICK_PARAMETERS = {"type": "object", "properties": {"index": {"type": "number"}}}
+CLICK_SPEC = {
+    "type": "function",
+    "name": "click",
+    "description": "Tap an element.",
+    "parameters": CLICK_PARAMETERS,
+}
 
 
 def _call(call_id, name, arguments):
@@ -85,7 +92,7 @@ class _Registry:
         return {"index": "number", "success": "boolean"}
 
     def get_function_tool_specs(self):
-        return [{"type": "function", "name": "click"}]
+        return [CLICK_SPEC]
 
     async def execute(self, name, parameters, _action_ctx, workflow_ctx=None):
         self.executed.append((name, parameters))
@@ -99,13 +106,22 @@ class _Registry:
         return ActionResult(success=True, summary=f"{name} executed")
 
 
-def _run(responses, *, native=True, tool_calling="auto", parallel_tools=True):
+def _run(
+    responses,
+    *,
+    native=True,
+    tool_calling="auto",
+    parallel_tools=True,
+    native_tool_api="responses",
+):
     async def _go():
         shared_state = MobileAgentState()
         registry = _Registry(shared_state)
         responder = _Responder(responses)
         agent = FastAgent(
-            llm=SimpleNamespace(supports_native_tool_calls=native),
+            llm=SimpleNamespace(
+                supports_native_tool_calls=native, native_tool_api=native_tool_api
+            ),
             agent_config=SimpleNamespace(
                 fast_agent=SimpleNamespace(
                     vision=False,
@@ -152,7 +168,7 @@ def test_native_tools_are_sent_and_answered_with_tool_messages():
     first_messages, first_kwargs = responder.requests[0]
     assert first_messages[0].content == "native"
     assert first_kwargs == {
-        "tools": [{"type": "function", "name": "click"}],
+        "tools": [CLICK_SPEC],
         "tool_choice": "required",
         "parallel_tool_calls": False,
     }
@@ -268,6 +284,33 @@ def test_history_serializes_to_responses_input():
     assert items[2]["call_id"] == items[3]["call_id"] == "call_1"
 
 
+def test_chat_completions_llms_get_chat_tools_and_history():
+    _, responder, _, _ = _run(
+        [_reply("I'll tap it.", _call("call_1", "click", {"index": 3})), _complete()],
+        native_tool_api="chat_completions",
+    )
+
+    first_kwargs = responder.requests[0][1]
+    assert first_kwargs == {
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "click",
+                    "description": "Tap an element.",
+                    "parameters": CLICK_PARAMETERS,
+                },
+            }
+        ],
+        "tool_choice": "auto",
+        "parallel_tool_calls": True,
+    }
+
+    items = to_openai_message_dicts(responder.requests[1][0][1:])
+    assert [item["role"] for item in items] == ["user", "assistant", "tool", "user"]
+    assert items[1]["tool_calls"][0]["id"] == items[2]["tool_call_id"] == "call_1"
+
+
 def test_registry_builds_function_tool_specs():
     registry = ToolRegistry()
     registry.register(
@@ -330,7 +373,7 @@ def test_retries_accept_tool_call_only_responses_and_forward_kwargs():
     assert calls == [{"tools": [{"name": "click"}]}]
 
 
-def test_openai_and_xai_llms_use_native_tools(monkeypatch):
+def test_openai_xai_and_deepseek_llms_use_native_tools(monkeypatch):
     from mobilerun.agent.utils.llm_picker import load_llm
     from mobilerun.agent.utils.oauth.grok_oauth_llm import GrokOAuth
     from mobilerun.agent.utils.oauth.openai_oauth_llm import OpenAIOAuth
@@ -340,5 +383,9 @@ def test_openai_and_xai_llms_use_native_tools(monkeypatch):
 
     assert load_llm("OpenAIResponses", model="gpt-6-luna").supports_native_tool_calls
     assert load_llm("XAI", model="grok-4.6").supports_native_tool_calls
+    deepseek = load_llm("DeepSeek", api_key="stub")
+    assert deepseek.supports_native_tool_calls
+    assert deepseek.native_tool_api == "chat_completions"
+    assert deepseek.class_name() == "OpenAILike"
     assert OpenAIOAuth.supports_native_tool_calls
     assert GrokOAuth.supports_native_tool_calls
