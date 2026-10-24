@@ -108,14 +108,54 @@ def strip_anthropic_sampling_params(
     return payload
 
 
-_stream_usage: ContextVar[dict[str, Any] | None] = ContextVar(
+class StreamUsage:
+    """Usage of one Anthropic stream, attached to its latest chunk.
+
+    The LlamaIndex adapter only yields content deltas, so the usage carried by
+    ``message_start`` and ``message_delta`` never reaches callers. Usage is
+    written onto the last yielded chunk before the stream ends, where both
+    callers and LlamaIndex callbacks read it.
+    """
+
+    def __init__(self) -> None:
+        self.usage: dict[str, Any] = {}
+        self._chunk: Any = None
+
+    def track(self, chunks: Any) -> Any:
+        for chunk in chunks:
+            self._chunk = chunk
+            yield chunk
+
+    async def atrack(self, chunks: Any) -> Any:
+        async for chunk in chunks:
+            self._chunk = chunk
+            yield chunk
+
+    def record(self, event: Any) -> None:
+        kind = getattr(event, "type", None)
+        if kind == "message_start":
+            usage = getattr(getattr(event, "message", None), "usage", None)
+        elif kind == "message_delta":
+            usage = getattr(event, "usage", None)
+        else:
+            return
+        if usage is None:
+            return
+        fields = usage.model_dump() if hasattr(usage, "model_dump") else dict(usage)
+        self.usage.update({k: v for k, v in fields.items() if v is not None})
+        if self._chunk is not None:
+            raw = self._chunk.raw if isinstance(self._chunk.raw, dict) else {}
+            self._chunk.raw = {**raw, "usage": dict(self.usage)}
+
+
+_stream_usage: ContextVar[StreamUsage | None] = ContextVar(
     "anthropic_stream_usage", default=None
 )
 
 
 @contextmanager
-def collect_stream_usage(usage: dict[str, Any]) -> Iterator[None]:
-    """Collect the usage of Anthropic streams opened in this block into *usage*."""
+def collect_stream_usage(usage: StreamUsage) -> Iterator[None]:
+    """Record the usage of Anthropic streams opened in this block."""
 
     token = _stream_usage.set(usage)
     try:
@@ -125,15 +165,11 @@ def collect_stream_usage(usage: dict[str, Any]) -> Iterator[None]:
 
 
 def record_stream_usage(messages: Any, *, is_async: bool = False) -> None:
-    """Wrap an SDK ``messages`` resource so streams report their usage.
-
-    The LlamaIndex adapter only yields content deltas, so the usage carried by
-    ``message_start`` and ``message_delta`` events never reaches callers.
-    """
+    """Wrap an SDK ``messages`` resource so streams report their usage."""
 
     create = messages.create
 
-    def _wrap(stream: Any, usage: dict[str, Any] | None, kwargs: dict) -> Any:
+    def _wrap(stream: Any, usage: StreamUsage | None, kwargs: dict) -> Any:
         if usage is None or not kwargs.get("stream"):
             return stream
         return _UsageRecordingStream(stream, usage)
@@ -156,7 +192,7 @@ def record_stream_usage(messages: Any, *, is_async: bool = False) -> None:
 
 
 class _UsageRecordingStream:
-    def __init__(self, stream: Any, usage: dict[str, Any]) -> None:
+    def __init__(self, stream: Any, usage: StreamUsage) -> None:
         self._stream = stream
         self._usage = usage
 
@@ -165,23 +201,10 @@ class _UsageRecordingStream:
 
     def __iter__(self) -> Any:
         for event in self._stream:
-            self._record(event)
+            self._usage.record(event)
             yield event
 
     async def __aiter__(self) -> Any:
         async for event in self._stream:
-            self._record(event)
+            self._usage.record(event)
             yield event
-
-    def _record(self, event: Any) -> None:
-        kind = getattr(event, "type", None)
-        if kind == "message_start":
-            usage = getattr(getattr(event, "message", None), "usage", None)
-        elif kind == "message_delta":
-            usage = getattr(event, "usage", None)
-        else:
-            return
-        if usage is None:
-            return
-        fields = usage.model_dump() if hasattr(usage, "model_dump") else dict(usage)
-        self._usage.update({k: v for k, v in fields.items() if v is not None})

@@ -16,6 +16,7 @@ from mobilerun.agent.providers.anthropic import (
     ANTHROPIC_API_DEFAULT_MODEL,
     ANTHROPIC_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
     ANTHROPIC_UNSUPPORTED_SAMPLING_PARAMS,
+    StreamUsage,
     anthropic_model_context_window,
     anthropic_model_omits_sampling_params,
     collect_stream_usage,
@@ -621,11 +622,6 @@ def _load_google_genai(**kwargs: Any) -> LLM:
     return MobilerunGoogleGenAI(**filtered_kwargs)
 
 
-def _with_stream_usage(last: ChatResponse, usage: dict[str, Any]) -> ChatResponse:
-    """Final stream chunk carrying the usage the content chunks lack."""
-    return last.model_copy(update={"delta": "", "raw": {"usage": dict(usage)}})
-
-
 def _load_anthropic(**kwargs: Any) -> LLM:
     from llama_index.llms.anthropic import Anthropic
 
@@ -636,32 +632,16 @@ def _load_anthropic(**kwargs: Any) -> LLM:
             record_stream_usage(self._aclient.messages, is_async=True)
 
         def stream_chat(self, messages: Any, **kwargs: Any) -> Any:
-            usage: dict[str, Any] = {}
+            usage = StreamUsage()
             with collect_stream_usage(usage):
                 response = super().stream_chat(messages, **kwargs)
-
-            def gen() -> Any:
-                last = None
-                for last in response:
-                    yield last
-                if last is not None and usage:
-                    yield _with_stream_usage(last, usage)
-
-            return gen()
+            return usage.track(response)
 
         async def astream_chat(self, messages: Any, **kwargs: Any) -> Any:
-            usage: dict[str, Any] = {}
+            usage = StreamUsage()
             with collect_stream_usage(usage):
                 response = await super().astream_chat(messages, **kwargs)
-
-            async def gen() -> Any:
-                last = None
-                async for last in response:
-                    yield last
-                if last is not None and usage:
-                    yield _with_stream_usage(last, usage)
-
-            return gen()
+            return usage.atrack(response)
 
         @wraps(Anthropic._prepare_chat_with_tools)
         def _prepare_chat_with_tools(self, *args: Any, **kwargs: Any) -> dict[str, Any]:

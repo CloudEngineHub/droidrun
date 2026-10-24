@@ -15,7 +15,7 @@ from anthropic.types import (
 )
 from llama_index.core.base.llms.types import ChatMessage
 
-from mobilerun.agent.usage import get_usage_from_response
+from mobilerun.agent.usage import get_usage_from_response, track_usage
 from mobilerun.agent.utils.inference import acall_with_retries
 from mobilerun.agent.utils.llm_picker import load_llm
 
@@ -109,6 +109,26 @@ def test_anthropic_sync_stream_reports_usage(monkeypatch):
     assert "".join(c.delta for c in chunks) == "Hello"
     assert chunks[-1].message.content == "Hello"
     _assert_usage(llm, chunks[-1])
+
+
+def test_anthropic_stream_usage_reaches_callbacks(monkeypatch):
+    llm = _anthropic_llm(monkeypatch)
+    tracker = track_usage(llm)
+    messages = [ChatMessage(role="user", content="hi")]
+
+    async def consume():
+        async for _ in await llm.astream_chat(messages):
+            pass
+
+    asyncio.run(consume())
+    list(llm.stream_chat(messages))
+
+    assert tracker.usage.model_dump() == {
+        "request_tokens": 240,
+        "response_tokens": 84,
+        "total_tokens": 324,
+        "requests": 2,
+    }
 
 
 def test_minimax_requests_usage_only_for_streams():
