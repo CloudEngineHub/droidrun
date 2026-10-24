@@ -18,6 +18,8 @@ from mobilerun.agent.providers.anthropic import (
     ANTHROPIC_UNSUPPORTED_SAMPLING_PARAMS,
     anthropic_model_context_window,
     anthropic_model_omits_sampling_params,
+    collect_stream_usage,
+    record_stream_usage,
 )
 from mobilerun.agent.providers.grok import (
     GROK_API_DEFAULT_MODEL,
@@ -619,10 +621,48 @@ def _load_google_genai(**kwargs: Any) -> LLM:
     return MobilerunGoogleGenAI(**filtered_kwargs)
 
 
+def _with_stream_usage(last: ChatResponse, usage: dict[str, Any]) -> ChatResponse:
+    """Final stream chunk carrying the usage the content chunks lack."""
+    return last.model_copy(update={"delta": "", "raw": {"usage": dict(usage)}})
+
+
 def _load_anthropic(**kwargs: Any) -> LLM:
     from llama_index.llms.anthropic import Anthropic
 
     class MobilerunAnthropic(Anthropic):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            record_stream_usage(self._client.messages)
+            record_stream_usage(self._aclient.messages, is_async=True)
+
+        def stream_chat(self, messages: Any, **kwargs: Any) -> Any:
+            usage: dict[str, Any] = {}
+            with collect_stream_usage(usage):
+                response = super().stream_chat(messages, **kwargs)
+
+            def gen() -> Any:
+                last = None
+                for last in response:
+                    yield last
+                if last is not None and usage:
+                    yield _with_stream_usage(last, usage)
+
+            return gen()
+
+        async def astream_chat(self, messages: Any, **kwargs: Any) -> Any:
+            usage: dict[str, Any] = {}
+            with collect_stream_usage(usage):
+                response = await super().astream_chat(messages, **kwargs)
+
+            async def gen() -> Any:
+                last = None
+                async for last in response:
+                    yield last
+                if last is not None and usage:
+                    yield _with_stream_usage(last, usage)
+
+            return gen()
+
         @wraps(Anthropic._prepare_chat_with_tools)
         def _prepare_chat_with_tools(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
             # FunctionCallingProgram passes None by default, overwriting the
