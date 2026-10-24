@@ -18,6 +18,30 @@ from mobilerun.agent.fast_agent.xml_parser import (
 )
 
 
+def native_tool_kwargs(
+    llm: Any, specs: List[Dict[str, Any]], parallel: bool
+) -> Dict[str, Any]:
+    """Build the request arguments that send tools to the LLM."""
+    if getattr(llm, "native_tool_api", "responses") == "chat_completions":
+        return {
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": spec["name"],
+                        "description": spec["description"],
+                        "parameters": spec["parameters"],
+                    },
+                }
+                for spec in specs
+            ],
+            # DeepSeek thinking mode rejects tool_choice="required".
+            "tool_choice": "auto",
+            "parallel_tool_calls": parallel,
+        }
+    return {"tools": specs, "tool_choice": "required", "parallel_tool_calls": parallel}
+
+
 def parse_native_tool_calls(
     message: ChatMessage, param_types: Optional[Dict[str, str]] = None
 ) -> ToolCallParseResult:
