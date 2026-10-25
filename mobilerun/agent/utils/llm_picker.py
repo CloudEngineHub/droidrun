@@ -1,7 +1,7 @@
 import inspect
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from llama_index.core.base.llms.types import (
     ChatMessage,
@@ -255,6 +255,8 @@ def _load_openai_responses(*, grok: bool = False, **kwargs: Any) -> LLM:
     _patch_responses_output_parser(OpenAIResponses)
 
     class MobilerunOpenAIResponses(OpenAIResponses):
+        supports_native_tool_calls: ClassVar[bool] = True
+
         @staticmethod
         def _validate_gpt6_reasoning(model: str, reasoning: object) -> None:
             if reasoning is None:
@@ -714,6 +716,20 @@ def _load_anthropic(**kwargs: Any) -> LLM:
     return MobilerunAnthropic(**filtered_kwargs)
 
 
+def _load_deepseek(**kwargs: Any) -> LLM:
+    from llama_index.llms.openai_like import OpenAILike
+
+    class MobilerunDeepSeek(OpenAILike):
+        supports_native_tool_calls: ClassVar[bool] = True
+        native_tool_api: ClassVar[str] = "chat_completions"
+
+    filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    logger.debug(
+        f"Initializing MobilerunDeepSeek with kwargs: {list(filtered_kwargs.keys())}"
+    )
+    return MobilerunDeepSeek(**filtered_kwargs)
+
+
 def load_llm(provider_name: str, model: str | None = None, **kwargs: Any) -> LLM:
     """Load and initialize a configured LLM backend.
 
@@ -848,6 +864,7 @@ def load_llm(provider_name: str, model: str | None = None, **kwargs: Any) -> LLM
         if "base_url" in kwargs and "api_base" not in kwargs:
             kwargs["api_base"] = kwargs.pop("base_url")
         kwargs.setdefault("api_base", "https://api.deepseek.com")
+        return _load_deepseek(**kwargs)
 
     # --- Standard providers (inline dispatch) ---
     if provider_name == "OpenAIResponses":

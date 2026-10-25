@@ -6,8 +6,10 @@ and talk directly to the device driver.
 
 import asyncio
 import json
+import logging
 import os
 import re
+import sys
 import tempfile
 from functools import wraps
 from typing import Optional
@@ -32,6 +34,7 @@ from mobilerun.agent.utils.android_device import (
 )
 from mobilerun.agent.utils.portal_setup import portal_version_kwargs
 from mobilerun.config_manager import ConfigLoader
+from mobilerun.log_handlers import configure_logging
 from mobilerun.tools.filters import ConciseFilter
 from mobilerun.tools.formatters import IndexedFormatter
 from mobilerun.tools.ui.ios_provider import IOSStateProvider
@@ -215,6 +218,20 @@ async def _create_driver(
     return driver, False
 
 
+def _log_progress_to_stderr() -> None:
+    """Show INFO progress (e.g. a slow UI-state fetch) on stderr.
+
+    Without this, Python's last-resort handler drops everything below
+    WARNING, so a slow device looks like a silent hang. stdout stays
+    reserved for the command's output.
+    """
+    if logging.getLogger("mobilerun").handlers:
+        return
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    configure_logging(debug=False, handler=handler)
+
+
 async def _teardown_android(driver):
     """Disable Mobilerun keyboard after direct command execution."""
     if isinstance(driver, AndroidDriver) and driver.device:
@@ -271,6 +288,7 @@ async def screenshot(device, config_path, tcp, ios, cloud, device_id, base_url):
 @coro
 async def ui(device, config_path, tcp, ios, cloud, device_id, base_url):
     """Print the UI accessibility tree with element bounds for targeting."""
+    _log_progress_to_stderr()
     driver, is_ios = await _create_driver(
         device, config_path, tcp, ios, cloud, device_id, base_url
     )
