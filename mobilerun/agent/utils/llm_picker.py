@@ -16,8 +16,11 @@ from mobilerun.agent.providers.anthropic import (
     ANTHROPIC_API_DEFAULT_MODEL,
     ANTHROPIC_MODELS_WITHOUT_FORCED_TOOL_CHOICE,
     ANTHROPIC_UNSUPPORTED_SAMPLING_PARAMS,
+    StreamUsage,
     anthropic_model_context_window,
     anthropic_model_omits_sampling_params,
+    collect_stream_usage,
+    record_stream_usage,
 )
 from mobilerun.agent.providers.grok import (
     GROK_API_DEFAULT_MODEL,
@@ -625,6 +628,23 @@ def _load_anthropic(**kwargs: Any) -> LLM:
     from llama_index.llms.anthropic import Anthropic
 
     class MobilerunAnthropic(Anthropic):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            record_stream_usage(self._client.messages)
+            record_stream_usage(self._aclient.messages, is_async=True)
+
+        def stream_chat(self, messages: Any, **kwargs: Any) -> Any:
+            usage = StreamUsage()
+            with collect_stream_usage(usage):
+                response = super().stream_chat(messages, **kwargs)
+            return usage.track(response)
+
+        async def astream_chat(self, messages: Any, **kwargs: Any) -> Any:
+            usage = StreamUsage()
+            with collect_stream_usage(usage):
+                response = await super().astream_chat(messages, **kwargs)
+            return usage.atrack(response)
+
         @wraps(Anthropic._prepare_chat_with_tools)
         def _prepare_chat_with_tools(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
             # FunctionCallingProgram passes None by default, overwriting the
