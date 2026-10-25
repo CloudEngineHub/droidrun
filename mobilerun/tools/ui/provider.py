@@ -307,15 +307,17 @@ class AndroidStateProvider(StateProvider):
         # instead of mapping model coordinates against a wrong screen size.
         self.requires_active_contract_for_coords = vision_enabled
 
-    async def _recover_portal(self) -> None:
-        """Restart Portal's accessibility service, TCP server and keyboard."""
+    def _portal_recovery(self) -> Optional[Callable[[], Awaitable[None]]]:
+        """Return Portal recovery, or None when there is no ADB device."""
         from mobilerun_core_local.driver.android import AndroidDriver
 
-        if not isinstance(self.driver, AndroidDriver):
-            return
+        if isinstance(self.driver, AndroidDriver) and self.driver.device is not None:
+            return self._recover_portal
+        return None
+
+    async def _recover_portal(self) -> None:
+        """Restart Portal's accessibility service, TCP server and keyboard."""
         device = self.driver.device
-        if device is None:
-            return
 
         from mobilerun_core_local.driver.android.portal import (
             PORTAL_PACKAGE_NAME,
@@ -367,7 +369,7 @@ class AndroidStateProvider(StateProvider):
     async def get_state(self) -> UIState:
         combined_data = await fetch_state_with_retry(
             fetch=self.driver.get_ui_tree,
-            recovery=self._recover_portal,
+            recovery=self._portal_recovery(),
         )
         return self._state_from_data(combined_data)
 
