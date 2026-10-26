@@ -96,6 +96,9 @@ packages = ["mobilerun"]
 [project.scripts]
 mobilerun = "mobilerun.cli.main:cli"
 
+[tool.uv]
+override-dependencies = ["filelock>=4.2.1"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py313"
