@@ -141,12 +141,18 @@ def test_bundled_templates_found():
     assert len(TEMPLATES) >= 8
 
 
-@pytest.mark.parametrize("path", TEMPLATES, ids=lambda p: str(p.relative_to(PROMPTS_DIR)))
 @pytest.mark.parametrize(
-    "variables", [_POPULATED, _EMPTY, _STRING_HISTORY], ids=["populated", "empty", "string-history"]
+    "path", TEMPLATES, ids=lambda p: str(p.relative_to(PROMPTS_DIR))
+)
+@pytest.mark.parametrize(
+    "variables",
+    [_POPULATED, _EMPTY, _STRING_HISTORY],
+    ids=["populated", "empty", "string-history"],
 )
 def test_bundled_templates_render_identically(path, variables):
     source = path.read_text(encoding="utf-8")
-    plain = Environment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=False)
+    plain = Environment(
+        trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=False
+    )
     expected = plain.from_string(source).render(**variables)
     assert PromptLoader.render_template(source, variables) == expected
